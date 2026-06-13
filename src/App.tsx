@@ -22,6 +22,9 @@ import {
 import { productsData } from "./data/modelsData";
 import { ChildProfile, Product, ChatMessage } from "./types";
 
+// Import translations
+import { translations, translateProduct } from "./lib/translate";
+
 // Import modular layouts
 import HomeSection from "./components/HomeSection";
 import NewsSection from "./components/NewsSection";
@@ -35,6 +38,17 @@ import { auth } from "./lib/firebase";
 import { getBookmarksFromFirestore, addBookmarkToFirestore, removeBookmarkFromFirestore } from "./lib/firestoreService";
 
 export default function App() {
+  // Lang toggle state
+  const [lang, setLang] = useState<"zh" | "en">(
+    () => (localStorage.getItem("app_lang") as "zh" | "en") || "zh"
+  );
+
+  useEffect(() => {
+    localStorage.setItem("app_lang", lang);
+  }, [lang]);
+
+  const t = translations[lang];
+
   // 1. Core child mechanics states
   const [childProfile, setChildProfile] = useState<ChildProfile>({
     age: 4,
@@ -107,11 +121,12 @@ export default function App() {
 
   // Initialize consultation chat with standard introduction
   useEffect(() => {
-    setChatMessages([
-      {
-        id: "wel_1",
-        role: "assistant",
-        content: `您好！我是“全球童车安全工效研究所”的AI首席重力与安全顾问。
+    if (lang === "zh") {
+      setChatMessages([
+        {
+          id: "wel_1",
+          role: "assistant",
+          content: `您好！我是“全球童车安全工效研究所”的AI首席重力与安全顾问。
 
 我已经获取了您输入的宝宝当前身体指标：
 - **年龄**：${childProfile.age} 岁
@@ -124,10 +139,32 @@ export default function App() {
 2. **手制动**：3岁以上宝宝必须配置握距小于 **42mm** 的窄距机械刹把，杜绝后蹬倒踩刹隐患。
 
 有什么关于童车车架材质、气胎缓冲、避震疲劳，或具体品牌车款（如 Woom、闪电、九能镁合金）的选择疑问吗？请随时提问！`,
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      }
-    ]);
-  }, [childProfile.age, childProfile.height, childProfile.inseam, childProfile.weight]);
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        }
+      ]);
+    } else {
+      setChatMessages([
+        {
+          id: "wel_1",
+          role: "assistant",
+          content: `Hello! I am the Chief Safety & Ergonomics Advisor here at the Global Kids Bike Laboratory.
+
+I have loaded your child's physical parameters:
+- **Age**: ${childProfile.age} years old
+- **Height**: ${childProfile.height} cm
+- **Inseam**: ${childProfile.inseam || "Not specified"} cm
+- **Weight**: ${childProfile.weight} kg
+
+Based on the official ISO 8098 and EN 1888 rigid standards:
+1. **Max Safe Bike Weight**: Must not exceed **${(childProfile.weight * 0.3).toFixed(1)}kg** (30% of child's body weight)! Anything heavier is safe-hazard prone to tipping, rolling, and balance loss.
+2. **Hand Braking**: Kids over 3 years old require custom hand lever grip-reaches of less than **42mm** to avoid braking grip slip hazards.
+
+Do you have any specific inquiries regarding materials, pneumatic dampening, carbon fiber, magnesium alloys, or particular brands (such as Specialized, Woom, Decathlon)? Ask me anything!`,
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        }
+      ]);
+    }
+  }, [childProfile.age, childProfile.height, childProfile.inseam, childProfile.weight, lang]);
 
   // Auto scroll chat to bottom
   useEffect(() => {
@@ -149,12 +186,13 @@ export default function App() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           messages: cleanedMessagesForApi,
-          childProfile: childProfile
+          childProfile: childProfile,
+          lang: lang
         })
       });
 
       if (!res.ok) {
-        throw new Error("模型响应失败，研究所专线故障。");
+        throw new Error(lang === "en" ? "Model response failed. Lab line down." : "模型响应失败，研究所专线故障。");
       }
 
       const data = await res.json();
@@ -169,17 +207,34 @@ export default function App() {
       ]);
     } catch (err: any) {
       console.error(err);
-      setExpertNotice("未能连上研究所卫星安全专网，正在启动本地工效计算库。");
-      
-      // Dynamic fallback based on user inputs
-      const safeLimit = (childProfile.weight * 0.3).toFixed(1);
-      
-      setChatMessages(prev => [
-        ...prev,
-        {
-          id: `ai_fallback_${Date.now()}`,
-          role: "assistant",
-          content: `⚠️【检测到本地安全备份】连线受阻，安全研究所启动脱机算力为您解答：
+      if (lang === "en") {
+        setExpertNotice("Failed to reach lab servers. Activating local offline fallback module.");
+        const safeLimit = (childProfile.weight * 0.3).toFixed(1);
+        setChatMessages(prev => [
+          ...prev,
+          {
+            id: `ai_fallback_${Date.now()}`,
+            role: "assistant",
+            content: `⚠️ [Local Security Backup Engaged] Connection offline. Safety lab fallback module active:
+
+**Custom safety guidelines for your child:**
+*   **Max Dead Weight**: Vehicle must be strictly limited under **${safeLimit} kg**! Do not purchase heavy carbon steel frames.
+*   **Short Reach Lever**: Choose dual hand V-brakes or discs with reaches of approx. **48mm**, instead of Coaster rear-pedal hub brakes brakes.
+*   **Pneumatic Tires**: Pressure dampening on air-elastic tires is 80% more efficient than solid PVC/EVA foam tires. Protects the delicate spine & inner vestibular nerves of young toddlers.
+
+*You may configure your GEMINI_API_KEY in the right panel Secrets section to activate advanced AI discussion.*`,
+            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          }
+        ]);
+      } else {
+        setExpertNotice("未能连上研究所卫星安全专网，正在启动本地工效计算库。");
+        const safeLimit = (childProfile.weight * 0.3).toFixed(1);
+        setChatMessages(prev => [
+          ...prev,
+          {
+            id: `ai_fallback_${Date.now()}`,
+            role: "assistant",
+            content: `⚠️【检测到本地安全备份】连线受阻，安全研究所启动脱机算力为您解答：
 
 **结合宝宝特征的专属规约：**
 *   **极限配重**：车辆必须限制在 **${safeLimit} kg** 以内，请勿网购过重的大铁架车。
@@ -187,9 +242,10 @@ export default function App() {
 *   **气橡胶胎**：橡胶轮胎因富弹性，泄压缓冲比PVC发泡胎好80%以上，更利于支撑小屁股并降低前庭震荡。
 
 *您可以在右手Secrets面板配置 GEMINI_API_KEY，解锁无阻多轮AI高级专线咨询。*`,
-          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        }
-      ]);
+            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          }
+        ]);
+      }
     } finally {
       setIsAiLoading(false);
     }
@@ -233,7 +289,7 @@ export default function App() {
       {/* 2026 Top safety Ribbon notice banner */}
       <div id="alert_banner" className="bg-amber-500 text-slate-950 px-4 py-2 text-center text-[11px] font-black tracking-wider uppercase flex items-center justify-center gap-2">
         <ShieldCheck className="w-4 h-4" />
-        <span>全球专业童车第三方实测决策平台 · 遵循 ISO 8098 制动与重力工效规范 · 自费自购 0 赞助</span>
+        <span>{t.topBanner}</span>
       </div>
 
       {/* Main sticky navigation header bar (PRD Columns Section 4.1.2) */}
@@ -247,9 +303,9 @@ export default function App() {
             </div>
             <div className="text-left">
               <h1 className="text-lg font-black tracking-tight text-white flex items-center gap-2">
-                童车评测实验室 <span className="text-[9px] bg-slate-800 text-amber-400 px-2 py-0.5 rounded border border-amber-400/20 font-mono uppercase">2026 OFFICIAL</span>
+                {t.brandTitle} <span className="text-[9px] bg-slate-800 text-amber-400 px-2 py-0.5 rounded border border-amber-400/20 font-mono uppercase">{t.versionStamp}</span>
               </h1>
-              <p className="text-[10px] text-slate-500 font-semibold tracking-wider uppercase">KidBikeLab · 全球选购决策官网</p>
+              <p className="text-[10px] text-slate-500 font-semibold tracking-wider uppercase">{t.subTitle}</p>
             </div>
           </div>
 
@@ -261,7 +317,7 @@ export default function App() {
                 activeTab === "home" ? "bg-amber-500 text-slate-950" : "text-slate-400 hover:text-white"
               }`}
             >
-              首页
+              {t.navHome}
             </button>
             <button
               onClick={() => setActiveTab("products")}
@@ -269,7 +325,7 @@ export default function App() {
                 activeTab === "products" ? "bg-amber-500 text-slate-950" : "text-slate-400 hover:text-white"
               }`}
             >
-              产品大全
+              {t.navProducts}
             </button>
             <button
               onClick={() => setActiveTab("evaluations")}
@@ -277,7 +333,7 @@ export default function App() {
                 activeTab === "evaluations" ? "bg-amber-500 text-slate-950" : "text-slate-400 hover:text-white"
               }`}
             >
-              评测中心
+              {t.navEvaluations}
             </button>
             <button
               onClick={() => setActiveTab("guides")}
@@ -285,7 +341,7 @@ export default function App() {
                 activeTab === "guides" ? "bg-amber-500 text-slate-950" : "text-slate-400 hover:text-white"
               }`}
             >
-              选购指南
+              {t.navGuides}
             </button>
             <button
               onClick={() => setActiveTab("news")}
@@ -293,7 +349,7 @@ export default function App() {
                 activeTab === "news" ? "bg-amber-500 text-slate-950" : "text-slate-400 hover:text-white"
               }`}
             >
-              全球资讯
+              {t.navNews}
             </button>
             <button
               onClick={() => setActiveTab("about")}
@@ -301,7 +357,7 @@ export default function App() {
                 activeTab === "about" ? "bg-amber-500 text-slate-950" : "text-slate-400 hover:text-white"
               }`}
             >
-              关于我们
+              {t.navAbout}
             </button>
             <button
               onClick={() => setActiveTab("auth")}
@@ -313,15 +369,18 @@ export default function App() {
                     : "text-slate-400 border-transparent hover:text-white"
               }`}
             >
-              {userEmail ? "👤 个人中心" : "🔑 注册登录"}
+              {userEmail ? (lang === "zh" ? "👤 个人中心" : "👤 Profile") : (lang === "zh" ? "🔑 注册登录" : "🔑 Sign In")}
             </button>
           </nav>
 
           {/* Quick En/Zh Flags switches and Assistant Toggle */}
           <div className="flex items-center gap-2 text-xs">
             {/* Quick En/Zh Toggle */}
-            <button onClick={() => alert("【语言通知】平台已自动检测您的浏览器内核为 简体中文。全球翻译站系统正在冷启动中。")} className="px-2.5 py-1.5 bg-slate-950 hover:bg-slate-850 rounded-lg text-slate-400 hover:text-white font-mono border border-slate-850">
-              🌐 ZH / EN
+            <button 
+              onClick={() => setLang(prev => prev === "zh" ? "en" : "zh")} 
+              className="px-2.5 py-1.5 bg-slate-950 hover:bg-slate-850 rounded-lg text-amber-500 hover:text-amber-400 font-mono border border-slate-850 active:scale-95 transition-all text-[11px]"
+            >
+              🌐 {lang === "zh" ? "EN" : "中"}
             </button>
             
             {/* Floating Assistant prompt trigger */}
@@ -330,7 +389,7 @@ export default function App() {
               className="bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-500 text-slate-950 px-3.5 py-1.5 rounded-lg font-black flex items-center gap-1.5 transition-all shadow-lg shadow-amber-500/10"
             >
               <MessageSquare className="w-3.5 h-3.5 stroke-[2.5]" />
-              {showAiDrawer ? "关闭智能顾问" : "连线AI顾问"}
+              {showAiDrawer ? t.closeAdvisor : t.connectAdvisor}
             </button>
           </div>
 
@@ -347,11 +406,12 @@ export default function App() {
             setActiveTab={setActiveTab}
             childProfile={childProfile}
             setChildProfile={setChildProfile}
+            lang={lang}
           />
         )}
 
         {activeTab === "news" && (
-          <NewsSection />
+          <NewsSection lang={lang} />
         )}
 
         {activeTab === "products" && (
@@ -364,6 +424,7 @@ export default function App() {
             setSavedProducts={updateSavedProductsAndFirestore}
             childProfile={childProfile}
             userEmail={userEmail}
+            lang={lang}
           />
         )}
 
@@ -372,6 +433,7 @@ export default function App() {
             productsData={productsData}
             onSelectProduct={setSelectedProduct}
             childProfile={childProfile}
+            lang={lang}
           />
         )}
 
@@ -381,11 +443,12 @@ export default function App() {
             onSelectProduct={setSelectedProduct}
             childProfile={childProfile}
             setChildProfile={setChildProfile}
+            lang={lang}
           />
         )}
 
         {activeTab === "about" && (
-          <AboutSection />
+          <AboutSection lang={lang} />
         )}
 
         {activeTab === "auth" && (
@@ -396,6 +459,7 @@ export default function App() {
             setSavedProducts={updateSavedProductsAndFirestore}
             onClearSaved={clearSavedBookmarks}
             productsData={productsData}
+            lang={lang}
           />
         )}
 
@@ -403,13 +467,13 @@ export default function App() {
 
       {/* FLOAT DRAWER FOR AI SCIENTIFIC CONSULTANT (Col 11.2 - AI 问答交互助理) */}
       {showAiDrawer && (
-        <div id="ai_advisor_drawer" className="fixed bottom-6 right-6 z-40 w-96 max-h-[80vh] bg-slate-900 border border-slate-800 rounded-3xl shadow-2xl flex flex-col justify-between overflow-hidden animate-fade-in">
+        <div id="ai_advisor_drawer" className="fixed bottom-6 right-6 z-40 w-96 max-h-[80vh] bg-slate-900 border border-slate-850 rounded-3xl shadow-2xl flex flex-col justify-between overflow-hidden animate-fade-in">
           
           {/* Drawer top banner */}
           <div className="bg-slate-950 p-4 border-b border-slate-850 flex justify-between items-center text-xs">
             <div className="flex items-center gap-2">
               <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
-              <strong className="text-white font-black uppercase tracking-wider">物理学安全重力 AI 专线顾问</strong>
+              <strong className="text-white font-black uppercase tracking-wider">{t.advisorTitle}</strong>
             </div>
             <button 
               onClick={() => setShowAiDrawer(false)}
@@ -440,7 +504,7 @@ export default function App() {
             {isAiLoading && (
               <div className="text-left py-2 flex items-center gap-2 text-slate-500 text-[10px]">
                 <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                正在深度解算多重物理工工力学公称公差...
+                {t.advisorLoading}
               </div>
             )}
             
@@ -459,7 +523,7 @@ export default function App() {
               type="text"
               value={userInput}
               onChange={(e) => setUserInput(e.target.value)}
-              placeholder="询问材质、手制动间距、倒踩刹危害、或特定车型..."
+              placeholder={lang === "en" ? "Ask about materials, reach distance, brakes, models..." : "询问材质、手制动间距、倒踩刹危害、或特定车型..."}
               className="flex-1 bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 placeholder:text-slate-600 focus:outline-none focus:ring-1 focus:ring-amber-500"
             />
             <button 
@@ -475,171 +539,221 @@ export default function App() {
       )}
 
       {/* DETAIL MODAL PANEL DRAWER */}
-      {selectedProduct && (
-        <div id="detail_modal" className="fixed inset-0 bg-slate-950/85 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in">
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl relative">
-            
-            {/* Upper static header background */}
-            <div className="bg-slate-950 p-6 border-b border-slate-850 flex justify-between items-start">
-              <div className="text-left">
-                <span className="text-[10px] bg-amber-500 text-slate-950 font-black px-2 py-0.5 rounded uppercase tracking-wider">
-                  {selectedProduct.brand} · 第三方物理实测报告
-                </span>
-                <h3 className="text-lg font-black text-white mt-1.5">{selectedProduct.name}</h3>
-              </div>
-              <button
-                onClick={() => setSelectedProduct(null)}
-                className="text-slate-400 hover:text-white bg-slate-900 p-2 rounded-xl border border-slate-80) hover:border-slate-700 font-black text-xs shrink-0"
-              >
-                ✕ 关闭报告
-              </button>
-            </div>
-
-            {/* Metric contents */}
-            <div className="p-6 space-y-6 text-left">
+      {selectedProduct && (() => {
+        const displayProduct = translateProduct(selectedProduct, lang);
+        return (
+          <div id="detail_modal" className="fixed inset-0 bg-slate-950/85 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in">
+            <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl relative">
               
-              {/* Overall Ratings */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-center">
-                
-                <div className="bg-slate-950 p-3 rounded-xl border border-slate-850">
-                  <span className="text-slate-500 text-[10px] block font-bold leading-none mb-1">科学综合工效分</span>
-                  <span className="text-amber-500 text-lg font-black font-mono">{selectedProduct.overallScore}</span>
-                </div>
-
-                <div className="bg-slate-950 p-3 rounded-xl border border-slate-850">
-                  <span className="text-slate-500 text-[10px] block font-bold leading-none mb-1">物理自重比优越值</span>
-                  <span className="text-green-400 text-lg font-black font-mono">{selectedProduct.weightScore}</span>
-                </div>
-
-                <div className="bg-slate-950 p-3 rounded-xl border border-slate-850">
-                  <span className="text-slate-500 text-[10px] block font-bold leading-none mb-1">制动与配件安全率</span>
-                  <span className="text-blue-400 text-lg font-black font-mono">{selectedProduct.safetyScore}</span>
-                </div>
-
-                <div className="bg-slate-950 p-3 rounded-xl border border-slate-850">
-                  <span className="text-slate-500 text-[10px] block font-bold leading-none mb-1">五通与轴深工效值</span>
-                  <span className="text-purple-400 text-lg font-black font-mono">{selectedProduct.geometryScore}</span>
-                </div>
-
-              </div>
-
-              {/* Specs detailed table */}
-              <div className="space-y-2">
-                <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest">🔬 物理参数精准测定一览：</h4>
-                <div className="bg-slate-950 p-4 rounded-xl border border-slate-850 space-y-2 text-xs">
-                  <div className="flex justify-between border-b border-slate-900 pb-2">
-                    <span className="text-slate-500">车辆称重净重量 (Weight)</span>
-                    <strong className="text-white font-mono">{selectedProduct.weight} kg</strong>
-                  </div>
-                  <div className="flex justify-between border-b border-slate-900 pb-2">
-                    <span className="text-slate-500">轮毂尺寸段 (Rim Size)</span>
-                    <strong className="text-white">{selectedProduct.wheelSize}</strong>
-                  </div>
-                  <div className="flex justify-between border-b border-slate-900 pb-2">
-                    <span className="text-slate-500">车架主管及吸震烤漆</span>
-                    <strong className="text-white">{selectedProduct.material}</strong>
-                  </div>
-                  <div className="flex justify-between border-b border-slate-900 pb-2">
-                    <span className="text-slate-500">制动器杠杆握距 (Brakes)</span>
-                    <strong className="text-white">{selectedProduct.brakeType}</strong>
-                  </div>
-                  <div className="flex justify-between border-b border-slate-900 pb-2">
-                    <span className="text-slate-500">外胎抓地与路阻粘性</span>
-                    <strong className="text-white">{selectedProduct.tireType}</strong>
-                  </div>
-                  <div className="flex justify-between pb-1">
-                    <span className="text-slate-500">合规通行认证资质</span>
-                    <strong className="text-white text-[11px] font-mono">{selectedProduct.safetyCertification.join(", ")}</strong>
-                  </div>
-                </div>
-              </div>
-
-              {/* Pros & Cons detailed lists */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-                
-                <div className="bg-green-950/10 border border-green-500/20 p-4 rounded-xl space-y-2">
-                  <span className="text-green-400 font-black block flex items-center gap-1 uppercase">
-                    <ThumbsUp className="w-4 h-4" />
-                    测评闪光点 (Pros)
+              {/* Upper static header background */}
+              <div className="bg-slate-950 p-6 border-b border-slate-850 flex justify-between items-start">
+                <div className="text-left">
+                  <span className="text-[10px] bg-amber-500 text-slate-950 font-black px-2 py-0.5 rounded uppercase tracking-wider">
+                    {displayProduct.brand} · {lang === "en" ? "Independent Metrology Report" : "第三方物理实测报告"}
                   </span>
-                  <ul className="list-disc list-inside text-slate-300 space-y-1.5 pl-1 leading-relaxed">
-                    {selectedProduct.pros.map((p, ip) => <li key={ip}>{p}</li>)}
-                  </ul>
+                  <h3 className="text-lg font-black text-white mt-1.5">{displayProduct.name}</h3>
                 </div>
-
-                <div className="bg-amber-950/10 border border-amber-500/20 p-4 rounded-xl space-y-2">
-                  <span className="text-amber-500 font-black block flex items-center gap-1 uppercase">
-                    <ThumbsDown className="w-4 h-4" />
-                    不避繁就简的瑕疵 (Cons)
-                  </span>
-                  <ul className="list-disc list-inside text-slate-300 space-y-1.5 pl-1 leading-relaxed">
-                    {selectedProduct.cons.map((c, ic) => <li key={ic}>{c}</li>)}
-                  </ul>
-                </div>
-
-              </div>
-
-              {/* Editorial verdict block */}
-              <div className="bg-slate-950 p-4 rounded-xl border border-slate-850 space-y-1">
-                <span className="text-xs text-amber-500 font-extrabold uppercase block tracking-wider">
-                  ✍️ 安全物理学家终极建议 (Verdict)
-                </span>
-                <p className="text-xs text-slate-300 leading-relaxed text-justify">
-                  {selectedProduct.editorVerdict}
-                </p>
-              </div>
-
-              {/* Interactive instant advising sync button */}
-              <div className="bg-amber-500/10 border border-amber-500/30 p-4 rounded-xl flex flex-col sm:flex-row justify-between items-center gap-3">
-                <span className="text-xs text-amber-100 font-medium text-center sm:text-left">
-                  已经就该车型的物理安全指标生成了您宝宝的安全咨询，需要立刻发给AI重力阻顾问详析吗？
-                </span>
                 <button
-                  onClick={() => {
-                    const inquiryText = `您好，我正在分析 [${selectedProduct.name}]（￥${selectedProduct.price}），请问它的实测材质 “${selectedProduct.material}” 和刹车“${selectedProduct.brakeType}”在应对我宝宝（${childProfile.age}岁、跨高${childProfile.inseam}cm、体重${childProfile.weight}kg）日常在平整或颠簸路骑行时有什么要严格规避的事项？`;
-                    setSelectedProduct(null);
-                    setShowAiDrawer(true);
-                    
-                    // Trigger dynamic instant chat user message simulation
-                    setChatMessages(prev => [
-                      ...prev,
-                      {
-                        id: `usr_${Date.now()}`,
-                        role: "user",
-                        content: inquiryText,
-                        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-                      }
-                    ]);
-                    triggerAiResponse([...chatMessages, { id: `usr_${Date.now()}`, role: "user", content: inquiryText }]);
-                  }}
-                  className="bg-amber-500 hover:bg-amber-600 font-black text-slate-950 text-xs px-4 py-2 rounded-xl shrink-0 flex items-center gap-1 active:scale-95 transition-all"
+                  onClick={() => setSelectedProduct(null)}
+                  className="text-slate-400 hover:text-white bg-slate-900 p-2 rounded-xl border border-slate-800 hover:border-slate-700 font-black text-xs shrink-0"
                 >
-                  一键发送问卷给AI顾问
-                  <ChevronRight className="w-3.5 h-3.5" />
+                  {lang === "en" ? "✕ Close Report" : "✕ 关闭报告"}
                 </button>
               </div>
 
-            </div>
+              {/* Metric contents */}
+              <div className="p-6 space-y-6 text-left">
+                
+                {/* Overall Ratings */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-center">
+                  
+                  <div className="bg-slate-950 p-3 rounded-xl border border-slate-850">
+                    <span className="text-slate-500 text-[10px] block font-bold leading-none mb-1">
+                      {lang === "en" ? "Ergonomic Score" : "科学综合工效分"}
+                    </span>
+                    <span className="text-amber-500 text-lg font-black font-mono">{displayProduct.overallScore}</span>
+                  </div>
 
+                  <div className="bg-slate-950 p-3 rounded-xl border border-slate-850">
+                    <span className="text-slate-500 text-[10px] block font-bold leading-none mb-1">
+                      {lang === "en" ? "Weight Ratio Score" : "物理自重比优越值"}
+                    </span>
+                    <span className="text-green-400 text-lg font-black font-mono">{displayProduct.weightScore}</span>
+                  </div>
+
+                  <div className="bg-slate-950 p-3 rounded-xl border border-slate-850">
+                    <span className="text-slate-500 text-[10px] block font-bold leading-none mb-1">
+                      {lang === "en" ? "Braking Safety" : "制动与配件安全率"}
+                    </span>
+                    <span className="text-blue-400 text-lg font-black font-mono">{displayProduct.safetyScore}</span>
+                  </div>
+
+                  <div className="bg-slate-950 p-3 rounded-xl border border-slate-850">
+                    <span className="text-slate-500 text-[10px] block font-bold leading-none mb-1">
+                      {lang === "en" ? "Q-Factor Value" : "五通与轴深工效值"}
+                    </span>
+                    <span className="text-purple-400 text-lg font-black font-mono">{displayProduct.geometryScore}</span>
+                  </div>
+
+                </div>
+
+                {/* Specs detailed table */}
+                <div className="space-y-2">
+                  <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest">
+                    {lang === "en" ? "🔬 Precision Physical Metric Measurement" : "🔬 物理参数精准测定一览："}
+                  </h4>
+                  <div className="bg-slate-950 p-4 rounded-xl border border-slate-850 space-y-2 text-xs">
+                    <div className="flex justify-between border-b border-slate-900 pb-2">
+                      <span className="text-slate-500">
+                        {lang === "en" ? "Measured Net Weight" : "车辆称重净重量 (Weight)"}
+                      </span>
+                      <strong className="text-white font-mono">{displayProduct.weight} kg</strong>
+                    </div>
+                    <div className="flex justify-between border-b border-slate-900 pb-2">
+                      <span className="text-slate-500">
+                        {lang === "en" ? "Rim Wheel Size" : "轮毂尺寸段 (Rim Size)"}
+                      </span>
+                      <strong className="text-white">{displayProduct.wheelSize}</strong>
+                    </div>
+                    <div className="flex justify-between border-b border-slate-900 pb-2">
+                      <span className="text-slate-500">
+                        {lang === "en" ? "Frame Tubing & Overcoat" : "车架主管及吸震烤漆"}
+                      </span>
+                      <strong className="text-white">{displayProduct.material}</strong>
+                    </div>
+                    <div className="flex justify-between border-b border-slate-900 pb-2">
+                      <span className="text-slate-500">
+                        {lang === "en" ? "Braking System & Grips" : "制动器杠杆握距 (Brakes)"}
+                      </span>
+                      <strong className="text-white">{displayProduct.brakeType}</strong>
+                    </div>
+                    <div className="flex justify-between border-b border-slate-900 pb-2">
+                      <span className="text-slate-500">
+                        {lang === "en" ? "Tires Road Traction" : "外胎抓地与路阻粘性"}
+                      </span>
+                      <strong className="text-white">{displayProduct.tireType}</strong>
+                    </div>
+                    <div className="flex justify-between pb-1">
+                      <span className="text-slate-500">
+                        {lang === "en" ? "Safety Certifications" : "合规通行认证资质"}
+                      </span>
+                      <strong className="text-white text-[11px] font-mono">{displayProduct.safetyCertification.join(", ")}</strong>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Pros & Cons detailed lists */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                  
+                  <div className="bg-green-950/10 border border-green-500/20 p-4 rounded-xl space-y-2">
+                    <span className="text-green-400 font-black block flex items-center gap-1 uppercase">
+                      <ThumbsUp className="w-4 h-4" />
+                      {lang === "en" ? "Testing Highlights (Pros)" : "测评闪光点 (Pros)"}
+                    </span>
+                    <ul className="list-disc list-inside text-slate-300 space-y-1.5 pl-1 leading-relaxed">
+                      {displayProduct.pros.map((p, ip) => <li key={ip}>{p}</li>)}
+                    </ul>
+                  </div>
+
+                  <div className="bg-amber-950/10 border border-amber-500/20 p-4 rounded-xl space-y-2">
+                    <span className="text-amber-500 font-black block flex items-center gap-1 uppercase">
+                      <ThumbsDown className="w-4 h-4" />
+                      {lang === "en" ? "Constructive Flaws (Cons)" : "不避繁就简的瑕疵 (Cons)"}
+                    </span>
+                    <ul className="list-disc list-inside text-slate-300 space-y-1.5 pl-1 leading-relaxed">
+                      {displayProduct.cons.map((c, ic) => <li key={ic}>{c}</li>)}
+                    </ul>
+                  </div>
+
+                </div>
+
+                {/* Editorial verdict block */}
+                <div className="bg-slate-950 p-4 rounded-xl border border-slate-850 space-y-1">
+                  <span className="text-xs text-amber-500 font-extrabold uppercase block tracking-wider">
+                    {lang === "en" ? "✍️ Safety Biomechanics Final Verdict" : "✍️ 安全物理学家终极建议 (Verdict)"}
+                  </span>
+                  <p className="text-xs text-slate-300 leading-relaxed text-justify">
+                    {displayProduct.editorVerdict}
+                  </p>
+                </div>
+
+                {/* Interactive instant advising sync button */}
+                <div className="bg-amber-500/10 border border-amber-500/30 p-4 rounded-xl flex flex-col sm:flex-row justify-between items-center gap-3">
+                  <span className="text-xs text-amber-100 font-medium text-center sm:text-left">
+                    {lang === "en" 
+                      ? "Custom safety biomechanic metrics calculated for your child. Speak with our Safety AI Advisor for a full analytics overview?"
+                      : "已经就该车型的物理安全指标生成了您宝宝的安全咨询，需要立刻发给AI重力阻顾问详析吗？"}
+                  </span>
+                  <button
+                    onClick={() => {
+                      const inquiryText = lang === "en"
+                        ? `Hello! I am analyzing [${displayProduct.name}] ($${displayProduct.price}). Please address how its physical frame materials "${displayProduct.material}" and braking style "${displayProduct.brakeType}" relate to my child (aged ${childProfile.age} yo, inseam ${childProfile.inseam}cm, weight ${childProfile.weight}kg) when riding on bumpy or flat trials.`
+                        : `您好，我正在分析 [${selectedProduct.name}]（￥${selectedProduct.price}），请问它的实测材质 “${selectedProduct.material}” 和刹车“${selectedProduct.brakeType}”在应对我宝宝（${childProfile.age}岁、跨高${childProfile.inseam}cm、体重${childProfile.weight}kg）日常在平整或颠簸路骑行时有什么要严格规避的事项？`;
+                      
+                      setSelectedProduct(null);
+                      setShowAiDrawer(true);
+                      
+                      // Trigger dynamic instant chat user message simulation
+                      setChatMessages(prev => [
+                        ...prev,
+                        {
+                          id: `usr_${Date.now()}`,
+                          role: "user",
+                          content: inquiryText,
+                          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                        }
+                      ]);
+                      triggerAiResponse([...chatMessages, { id: `usr_${Date.now()}`, role: "user", content: inquiryText }]);
+                    }}
+                    className="bg-amber-500 hover:bg-amber-600 font-black text-slate-950 text-xs px-4 py-2 rounded-xl shrink-0 flex items-center gap-1 active:scale-95 transition-all w-full sm:w-auto justify-center"
+                  >
+                    {lang === "en" ? "Send to Safety AI" : "一键发送问卷给AI顾问"}
+                    <ChevronRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+
+              </div>
+
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Persistent global Foot Trust copyright (PRD Footer Column Section 4.1.8) */}
       <footer id="main_footer" className="bg-slate-900 border-t border-slate-900 text-slate-500 text-center py-10 text-xs space-y-2 mt-16">
         <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row justify-between items-center gap-4 text-slate-450 text-left sm:text-right">
           <div>
-            <span className="font-extrabold text-slate-400 block sm:inline">© 2026 全球专业童车第三方评测与选购决策官网 Inc. </span>
-            <p className="text-[10px] text-slate-600 mt-0.5">实验室全自动24小时温控测试系统备案</p>
+            <span className="font-extrabold text-slate-400 block sm:inline">
+              {lang === "en" 
+                ? "© 2026 Kids Bike Physical Testing Lab & Buyer's Decision Advisory Portal, Inc."
+                : "© 2026 全球专业童车第三方评测与选购决策官网 Inc. "}
+            </span>
+            <p className="text-[10px] text-slate-600 mt-0.5">
+              {lang === "en" ? "Automated 24h testing telemetry lab servers active" : "实验室全自动24小时温控测试系统备案"}
+            </p>
           </div>
           <div className="flex gap-4">
-            <span className="hover:text-white transition cursor-pointer" onClick={() => alert("【免责声明】评测研究所所有的分值和轮径、车重警示公式均为客观力学与学术判定推演，不代指法律强制判定。安全第一，骑行请配头盔手套。")}>免责声明</span>
-            <span className="hover:text-white transition cursor-pointer" onClick={() => activeTab !== "guides" && setActiveTab("guides")}>智能选型算力白皮书</span>
-            <span className="hover:text-white transition cursor-pointer" onClick={() => activeTab !== "about" && setActiveTab("about")}>GDPR与前庭保护通用政策</span>
+            <span className="hover:text-white transition cursor-pointer" onClick={() => {
+              if (lang === "en") {
+                alert("Disclaimer: All score indexes, rim-size suggestions, load ratios are academic biomechanic predictions and do not substitute legal certifications. Wear safety gear & helmets at all times.");
+              } else {
+                alert("【免责声明】评测研究所所有的分值和轮径、车重警示公式均为客观力学与学术判定推演，不代指法律强制判定。安全第一，骑行请配头盔手套。");
+              }
+            }}>
+              {lang === "en" ? "Disclaimer" : "免责声明"}
+            </span>
+            <span className="hover:text-white transition cursor-pointer" onClick={() => activeTab !== "guides" && setActiveTab("guides")}>
+              {lang === "en" ? "Smart Sizing Whitepaper" : "智能选型算力白皮书"}
+            </span>
+            <span className="hover:text-white transition cursor-pointer" onClick={() => activeTab !== "about" && setActiveTab("about")}>
+              {lang === "en" ? "Privacy & Family Protection Policy" : "GDPR与前庭保护通用政策"}
+            </span>
           </div>
         </div>
         <p className="max-w-4xl mx-auto px-4 text-[10px] text-slate-600 leading-relaxed text-justify">
-          中立及安全申明：本站展示的产品力参数及工效比分均为研究所依据Q-Factor参数及制动握距机械杠杆阻力等客观物理公式计算得出。我们拒绝任何童车厂家商业性排名植入款。多合一变形车安全检验报告、倒倒刹严重安全迷思项均公开备案，欢迎各质检单位及家长随时索取原件。
+          {lang === "en"
+            ? "Unbiased & Safety Oath: All ratings, scores, and mechanical metric listings displayed here are calculated using pure geometric formulas, rigid physical stress testing, and real weight balances. We do not accept sponsorship insertions, marketing fees, or pay-to-be-ranked items. Slide clearance issues and dangerous coaster brake hub mechanisms are openly logged for parent audit requests."
+            : "中立及安全申明：本站展示的产品力参数及工效比分均为研究所依据Q-Factor参数及制动握距机械杠杆阻力等客观物理公式计算得出。我们拒绝任何童车厂家商业性排名植入款。多合一变形车安全检验报告、倒倒刹严重安全迷思项均公开备案，欢迎各质检单位及家长随时索取原件。"}
         </p>
       </footer>
 

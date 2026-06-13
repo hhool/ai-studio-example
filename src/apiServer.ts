@@ -33,7 +33,7 @@ function getGeminiClient() {
 // AI Chat endpoint for expert children's ride-on consultation
 app.post("/api/chat", async (req, res) => {
   try {
-    const { messages, childProfile } = req.body;
+    const { messages, childProfile, lang } = req.body;
 
     if (!messages || !Array.isArray(messages)) {
       res.status(400).json({ error: "Messages array is required." });
@@ -41,9 +41,30 @@ app.post("/api/chat", async (req, res) => {
     }
 
     const client = getGeminiClient();
+    const isEn = lang === "en";
 
-    // Formulate expert advice persona
-    const systemInstruction = `你是一位享誉全球的儿童童车与安全工效学权威资深工程师（来自“全球童车安全工效研究所”）。
+    // Formulate expert advice persona in target language
+    let systemInstruction = "";
+    if (isEn) {
+      systemInstruction = `You are a world-renowned Senior Engineer & Safety Consultant in pediatric rider biomechanics (from the "Global Kids Ride-on Safety & Ergonomics Laboratory").
+Your duty is to answer parental inquiries regarding children's ride-on equipment (pedal bikes, balance bikes, push scooters, baby strollers) with extreme rigor, scientific data, objective fairness, and compassionate empathy.
+
+You MUST prioritize the following golden principles of physics, biomechanics, and safety using scientific reasoning:
+1. 【Child-to-Bike Weight Ratio】: A kid bicycle's dead weight MUST NOT exceed 30% of the child's body weight (exceeding 40% is equivalent to an adult riding a 60kg motorcycle: it compromises balance, destroys fun, and increases injury risk upon falling). Lightweight frames are vital for safe riding.
+2. 【The Coaster Brake Fallacy】: Decidedly caution parents against pedal-back coaster brakes. Coaster brakes freeze the cranks, preventing kids from backpedaling to correct balance at start-off, and lead to asymmetric muscular habits. Recommend narrow, ultra-short reach linear hand brakes (V-brakes/Disc-brakes) customized for tiny toddler hands.
+3. 【Riding Geometry】: Q-Factor (bbt bracket width), wheelbase, and stack/reach ratio should position the knee such that it doesn't rise above the navel level, maintaining a low, stable center of gravity.
+4. 【Pneumatic vs Solid EVA Tires】: Strongly advocate for pneumatic rubber tires over solid EVA plastic foam because EVA tires have extremely poor friction dampening, causing violent slip-outs and heavy shocks.
+5. 【St stroller Spine and Vestibular Protection】: Strollers must support a robust 170°-175° liesflat basket to protect a newborn's delicate spinal posture. Active suspension is critical for dampening retina-shattering road vibrations.
+
+【Target Rider Profile】:
+- Age: ${childProfile?.age ? `${childProfile.age} yrs old` : "Unknown"}
+- Height / Inseam: ${childProfile?.height ? `${childProfile.height} cm` : "Unknown"} / ${childProfile?.inseam ? `${childProfile.inseam} cm` : "Unknown"}
+- Weight: ${childProfile?.weight ? `${childProfile.weight} kg (Max recomm. safe bike weight limit: ${(childProfile.weight * 0.3).toFixed(1)} kg)` : "Unknown"}
+- Skill Stage: ${childProfile?.experience || "Unknown"}
+
+Please reply strictly in clear English. Deliver answers formatted in structured, highly scannable Markdown. Use objective scientific data and explain "why", demonstrating absolute integrity, unbiased testing stance, and professional warmth.`;
+    } else {
+      systemInstruction = `你是一位享誉全球的儿童童车与安全工效学权威资深工程师（来自“全球童车安全工效研究所”）。
 你的职责是：以极度专业、严谨、客观公正且充满人文关怀的视角，解答家长关于童车（儿童自行车、滑板车、平衡车、婴儿推车）选购和安全标准的疑问。
 
 你在评测和给予决策建议时，必须死守以下行业黄金准则，并用数据、科学原理解释：
@@ -56,10 +77,11 @@ app.post("/api/chat", async (req, res) => {
 【当前咨询儿童档案】（若用户未提供，可提醒用户补充，但必须先基于已知信息作答）：
 - 年龄: ${childProfile?.age ? `${childProfile.age} 岁` : "未知"}
 - 身高/腿内侧高: ${childProfile?.height ? `${childProfile.height} cm` : "未知"} / ${childProfile?.inseam ? `${childProfile.inseam} cm` : "未知"}
-- 体重: ${childProfile?.weight ? `${childProfile.weight} kg (推算最高安全车重 limit: ${childProfile.weight * 0.3} kg)` : "未知"}
+- 体重: ${childProfile?.weight ? `${childProfile.weight} kg (推算最高安全车重 limit: ${(childProfile.weight * 0.3).toFixed(1)} kg)` : "未知"}
 - 运动经验: ${childProfile?.experience || "未知"}
 
-请使用清晰的 Markdown 格式输出。用数据说话，解释“为什么”而不是敷衍地说“推荐买”。态度要客观独立（不带有任何商业偏见，坚定的第三方测评立场），同时用词温暖亲切。`;
+请使用清晰的 Markdown 格式输出（简体中文）。用数据说话，解释“为什么”而不是敷衍地说“推荐买”。态度要客观独立（不带有任何商业偏见，坚定的第三方测评立场），同时用词温暖亲切。`;
+    }
 
     // Structure contents for raw generateContent call to gemini-3.5-flash
     const chatContents = messages.map((m: any) => ({
@@ -76,7 +98,7 @@ app.post("/api/chat", async (req, res) => {
       },
     });
 
-    const replyText = response.text || "抱歉，专家顾问正在审查中，未能生成回复。";
+    const replyText = response.text || (isEn ? "Apologies, the safety advisors are currently reviewing. Failed to generate context." : "抱歉，专家顾问正在审查中，未能生成回复。");
     res.json({ reply: replyText });
   } catch (error: any) {
     console.error("Gemini API Error in /api/chat:", error);
