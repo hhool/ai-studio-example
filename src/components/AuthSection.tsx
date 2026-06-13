@@ -17,6 +17,15 @@ import {
   Trash2
 } from "lucide-react";
 import { Product } from "../types";
+import { 
+  signInWithPopup, 
+  GoogleAuthProvider, 
+  signOut,
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword
+} from "firebase/auth";
+import { auth } from "../lib/firebase";
+import { ensureUserProfileInFirestore } from "../lib/firestoreService";
 
 interface AuthSectionProps {
   userEmail: string;
@@ -35,6 +44,11 @@ export default function AuthSection({
   onClearSaved,
   productsData
 }: AuthSectionProps) {
+  // Sync page state when user logouts/logins from parent listener
+  useEffect(() => {
+    setIsRegistered(!!userEmail);
+  }, [userEmail]);
+
   // Auth state
   const [isRegistered, setIsRegistered] = useState<boolean>(!!userEmail);
   const [emailInput, setEmailInput] = useState<string>("");
@@ -81,7 +95,25 @@ export default function AuthSection({
     alert(`【模拟安全信道】安全研究所已向您的邮箱 [${emailInput}] 送出了单向哈希数字验证码：\n\n👉  ${code}  👈\n\n（验证码 5 分钟内有效，请在下方框内输入核验）`);
   };
 
-  const handleRegisterSubmit = (e: FormEvent) => {
+  const handleGoogleSignIn = async () => {
+    setErrorMessage("");
+    setSuccessMessage("");
+    try {
+      const provider = new GoogleAuthProvider();
+      const result = await signInWithPopup(auth, provider);
+      if (result.user) {
+        await ensureUserProfileInFirestore(result.user.uid, result.user.email || "");
+        setUserEmail(result.user.email || "");
+        setIsRegistered(true);
+        setSuccessMessage("🎉 登录成功！已为您同步云端收藏夹与安全顾问环境。");
+      }
+    } catch (error: any) {
+      console.error(error);
+      setErrorMessage("Google 快速登录遇到问题: " + error.message);
+    }
+  };
+
+  const handleRegisterSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setErrorMessage("");
     setSuccessMessage("");
@@ -111,13 +143,47 @@ export default function AuthSection({
       return;
     }
 
-    // Success Authentication Simulator
-    setUserEmail(emailInput);
-    setIsRegistered(true);
-    setSuccessMessage("恭喜您！注册成功。您已成功激活“全球童车尊享终身免费订阅会员”！五大特权已解锁。");
+    try {
+      // Create user within Firebase auth
+      const result = await createUserWithEmailAndPassword(auth, emailInput, passwordInput);
+      if (result.user) {
+        await ensureUserProfileInFirestore(result.user.uid, result.user.email || "");
+        setUserEmail(result.user.email || "");
+        setIsRegistered(true);
+        setSuccessMessage("恭喜您！注册成功。您已成功激活“全球童车尊享终身免费订阅会员”！五大特权已解锁并且已经与云端同步。");
+      }
+    } catch (authError: any) {
+      // Resilient fallback in case Email/Password registry is not turned on in Firebase Console
+      if (authError.code === "auth/operation-not-allowed") {
+        console.warn("Email/Password auth not enabled in Firebase, falling back to local credentials.", authError);
+        setUserEmail(emailInput);
+        setIsRegistered(true);
+        setSuccessMessage("恭喜您！注册成功（本地哈希安全沙盒已启动）。您已成功激活“全球童车尊享终身免费订阅会员”！五大特权已解锁（如需云同步，推荐使用上方 Google 账号快捷登录）。");
+      } else if (authError.code === "auth/email-already-in-use") {
+        // If they already created this, try signing them in with that password instead of throwing!
+        try {
+          const loginResult = await signInWithEmailAndPassword(auth, emailInput, passwordInput);
+          if (loginResult.user) {
+            await ensureUserProfileInFirestore(loginResult.user.uid, loginResult.user.email || "");
+            setUserEmail(loginResult.user.email || "");
+            setIsRegistered(true);
+            setSuccessMessage("🎉 欢迎回来！您已成功登录“全球童车”会员云中心。");
+          }
+        } catch (loginErr: any) {
+          setErrorMessage("此邮箱已被注册，且未能通过密码验证。请重新校对密码或使用其他邮箱，亦可使用下方 Google 直接登录。");
+        }
+      } else {
+        setErrorMessage("注册遇到未配置完整的安全报错: " + authError.message);
+      }
+    }
   };
 
-  const handleLogOut = () => {
+  const handleLogOut = async () => {
+    try {
+      await signOut(auth);
+    } catch (err) {
+      console.error("Firebase Signout error:", err);
+    }
     setUserEmail("");
     setEmailInput("");
     setPasswordInput("");
@@ -338,6 +404,41 @@ export default function AuthSection({
               🎉 {successMessage}
             </div>
           )}
+
+          {/* Google Sign In option */}
+          <div className="space-y-3">
+            <button
+              type="button"
+              onClick={handleGoogleSignIn}
+              className="w-full py-3 bg-white hover:bg-slate-100 text-slate-900 font-bold rounded-xl shadow-lg border border-slate-200 flex items-center justify-center gap-2.5 transition active:scale-95 text-xs cursor-pointer"
+            >
+              <svg className="w-4 h-4" viewBox="0 0 24 24">
+                <path
+                  fill="#4285F4"
+                  d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v3.92h6.61c-.29 1.5-1.14 2.77-2.4 3.63v3.02h3.88c2.27-2.09 3.57-5.17 3.57-8.5z"
+                />
+                <path
+                  fill="#34A853"
+                  d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.02c-1.08.72-2.45 1.16-4.05 1.16-3.11 0-5.74-2.11-6.68-4.96H1.21v3.11C3.18 21.88 7.39 24 12 24z"
+                />
+                <path
+                  fill="#FBBC05"
+                  d="M5.32 14.27c-.24-.72-.38-1.5-.38-2.27s.14-1.55.38-2.27V6.62H1.21C.44 8.16 0 10.02 0 12s.44 3.84 1.21 5.38l4.11-3.11z"
+                />
+                <path
+                  fill="#EA4335"
+                  d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.39 0 3.18 2.12 1.21 5.38l4.11 3.11c.94-2.85 3.57-4.96 6.68-4.96z"
+                />
+              </svg>
+              <span>使用 Google 账号快捷安全登录</span>
+            </button>
+
+            <div className="flex items-center gap-2 py-1 text-[10px] text-slate-500">
+              <div className="h-[1px] bg-slate-800 flex-1"></div>
+              <span>或通过双因子安全邮箱注册/登录</span>
+              <div className="h-[1px] bg-slate-800 flex-1"></div>
+            </div>
+          </div>
 
           {/* Core Submit form */}
           <form onSubmit={handleRegisterSubmit} className="space-y-4 text-xs">

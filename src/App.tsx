@@ -31,6 +31,9 @@ import GuidesSection from "./components/GuidesSection";
 import AboutSection from "./components/AboutSection";
 import AuthSection from "./components/AuthSection";
 
+import { auth } from "./lib/firebase";
+import { getBookmarksFromFirestore, addBookmarkToFirestore, removeBookmarkFromFirestore } from "./lib/firestoreService";
+
 export default function App() {
   // 1. Core child mechanics states
   const [childProfile, setChildProfile] = useState<ChildProfile>({
@@ -48,6 +51,48 @@ export default function App() {
   const [savedProducts, setSavedProducts] = useState<Product[]>([]);
   const [compareList, setCompareList] = useState<Product[]>([]);
   const [userEmail, setUserEmail] = useState<string>("");
+
+  // Listen to Firebase Auth state
+  useEffect(() => {
+    const unsubscribe = auth.onAuthStateChanged(async (user) => {
+      if (user) {
+        setUserEmail(user.email || "");
+        try {
+          const bookmarkedIds = await getBookmarksFromFirestore(user.uid);
+          const mappedProducts = productsData.filter((p) => bookmarkedIds.includes(p.id));
+          setSavedProducts(mappedProducts);
+        } catch (error) {
+          console.error("加载云端收藏夹失败:", error);
+        }
+      } else {
+        setUserEmail("");
+        setSavedProducts([]);
+      }
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // Interceptor wrapper to synchronize bookmark additions/removals with Firebase
+  const updateSavedProductsAndFirestore = async (newProducts: Product[]) => {
+    const currentUser = auth.currentUser;
+    if (currentUser) {
+      const currentIds = savedProducts.map(p => p.id);
+      const newIds = newProducts.map(p => p.id);
+      
+      // Check which items were added
+      const added = newProducts.filter(p => !currentIds.includes(p.id));
+      for (const item of added) {
+        await addBookmarkToFirestore(currentUser.uid, item.id);
+      }
+      
+      // Check which items were removed
+      const removed = savedProducts.filter(p => !newIds.includes(p.id));
+      for (const item of removed) {
+        await removeBookmarkFromFirestore(currentUser.uid, item.id);
+      }
+    }
+    setSavedProducts(newProducts);
+  };
 
   // 4. Modal detail overlays
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
@@ -168,7 +213,17 @@ export default function App() {
     await triggerAiResponse(updatedMessages);
   };
 
-  const clearSavedBookmarks = () => {
+  const clearSavedBookmarks = async () => {
+    const currentUser = auth.currentUser;
+    if (currentUser) {
+      try {
+        for (const item of savedProducts) {
+          await removeBookmarkFromFirestore(currentUser.uid, item.id);
+        }
+      } catch (error) {
+        console.error("清除云端收藏夹失败:", error);
+      }
+    }
     setSavedProducts([]);
   };
 
@@ -188,7 +243,7 @@ export default function App() {
           {/* Brand Logo and custom version stamp */}
           <div className="flex items-center gap-3 cursor-pointer select-none" onClick={() => setActiveTab("home")}>
             <div className="bg-gradient-to-tr from-amber-500 to-amber-600 p-2.5 rounded-xl shadow-lg shadow-amber-500/20">
-              <Baby className="w-5.5 h-5.5 text-slate-950 stroke-[2.5]" />
+              <Baby className="w-5 h-5 text-slate-950 stroke-[2.5]" />
             </div>
             <div className="text-left">
               <h1 className="text-lg font-black tracking-tight text-white flex items-center gap-2">
@@ -207,14 +262,6 @@ export default function App() {
               }`}
             >
               首页
-            </button>
-            <button
-              onClick={() => setActiveTab("news")}
-              className={`px-3 py-2 rounded-lg font-bold transition-all ${
-                activeTab === "news" ? "bg-amber-500 text-slate-950" : "text-slate-400 hover:text-white"
-              }`}
-            >
-              全球资讯
             </button>
             <button
               onClick={() => setActiveTab("products")}
@@ -239,6 +286,14 @@ export default function App() {
               }`}
             >
               选购指南
+            </button>
+            <button
+              onClick={() => setActiveTab("news")}
+              className={`px-3 py-2 rounded-lg font-bold transition-all ${
+                activeTab === "news" ? "bg-amber-500 text-slate-950" : "text-slate-400 hover:text-white"
+              }`}
+            >
+              全球资讯
             </button>
             <button
               onClick={() => setActiveTab("about")}
@@ -306,7 +361,7 @@ export default function App() {
             compareList={compareList}
             setCompareList={setCompareList}
             savedProducts={savedProducts}
-            setSavedProducts={setSavedProducts}
+            setSavedProducts={updateSavedProductsAndFirestore}
             childProfile={childProfile}
             userEmail={userEmail}
           />
@@ -338,7 +393,7 @@ export default function App() {
             userEmail={userEmail}
             setUserEmail={setUserEmail}
             savedProducts={savedProducts}
-            setSavedProducts={setSavedProducts}
+            setSavedProducts={updateSavedProductsAndFirestore}
             onClearSaved={clearSavedBookmarks}
             productsData={productsData}
           />

@@ -60,7 +60,7 @@ export default function HomeSection({
             </p>
             <div className="flex flex-col sm:flex-row gap-3 pt-2 text-xs">
               <button 
-                onClick={() => setActiveTab("calculator")}
+                onClick={() => setActiveTab("guides")}
                 className="px-6 py-3 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black rounded-xl transition flex items-center justify-center gap-1 active:scale-95 shadow-lg shadow-amber-500/10"
               >
                 智能安全算力箱 🔬
@@ -208,7 +208,7 @@ export default function HomeSection({
             </p>
           </div>
           <button 
-            onClick={() => setActiveTab("calculator")}
+            onClick={() => setActiveTab("guides")}
             className="px-6 py-3 bg-slate-950 text-white font-black text-xs uppercase hover:bg-slate-850 rounded-xl transition shrink-0 active:scale-95"
           >
             立即匹配宝宝黄金规格

@@ -37,7 +37,7 @@ export default function GuidesSection({
 }: GuidesSectionProps) {
   const [selectedGuide, setSelectedGuide] = useState<GuideArticle | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
-  const [searchQuery, setSearchQuery] = useState<string>("").trim();
+  const [searchQuery, setSearchQuery] = useState<string>("");
 
   // Match Wizard interactive states
   const [wizardAge, setWizardAge] = useState<number>(childProfile.age || 4);
@@ -50,12 +50,13 @@ export default function GuidesSection({
 
   // Guide Article filters
   const filteredGuides = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
     return guideArticles.filter((art) => {
       const matchesCat = selectedCategory === "all" || art.category === selectedCategory;
-      const matchesSearch = searchQuery === "" ||
-        art.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        art.summary.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        art.content.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesSearch = query === "" ||
+        art.title.toLowerCase().includes(query) ||
+        art.summary.toLowerCase().includes(query) ||
+        art.content.toLowerCase().includes(query);
       return matchesCat && matchesSearch;
     });
   }, [selectedCategory, searchQuery]);
@@ -95,13 +96,39 @@ export default function GuidesSection({
       // Must be below budget
       const withinBudget = p.price <= wizardBudget;
       
-      // Categorization fits generally
-      const isWheelSizeMatch = p.wheelSize === "无" || p.wheelSize.includes(recWheel.split("寸")[0]);
+      // Categorization/wheel size fits generally
+      let isWheelSizeMatch = true;
+      if (p.wheelSize !== "无") {
+        const sizeNum = parseInt(p.wheelSize);
+        if (!isNaN(sizeNum)) {
+          if (wizardInseam < 34) {
+            isWheelSizeMatch = sizeNum <= 12;
+          } else if (wizardInseam >= 34 && wizardInseam <= 40) {
+            isWheelSizeMatch = sizeNum === 12 || sizeNum === 14;
+          } else if (wizardInseam >= 41 && wizardInseam <= 48) {
+            isWheelSizeMatch = sizeNum === 14 || sizeNum === 16;
+          } else if (wizardInseam >= 49 && wizardInseam <= 56) {
+            isWheelSizeMatch = sizeNum === 16 || sizeNum === 20;
+          } else {
+            isWheelSizeMatch = sizeNum >= 20;
+          }
+        }
+      }
       
+      // Specific Scenario matches
+      let isScenarioMatch = true;
+      if (wizardScenario === "tight") {
+        // tight constraint: value extreme portability and low weight (vehicle weight <= perfectWeightLimit or category is stroller/scooter/balance)
+        isScenarioMatch = p.weight <= perfectWeightLimit || p.category === "scooter" || p.category === "balance";
+      } else if (wizardScenario === "rough") {
+        // rough constraint: rough terrain, prefer pneumatic/rubber offroad tire or heavy-duty traction
+        isScenarioMatch = p.tireType.includes("充气") || p.tireType.includes("越野") || p.tireType.includes("橡胶");
+      }
+
       // Heavy/weight safety check
       const isWeightSafe = p.weight <= dangerWeightLimit || p.category === "stroller" || p.category === "safety_seat";
 
-      return withinBudget && isWeightSafe;
+      return withinBudget && isWeightSafe && isWheelSizeMatch && isScenarioMatch;
     });
 
     return {
@@ -111,7 +138,7 @@ export default function GuidesSection({
       matches,
       recCat
     };
-  }, [wizardAge, wizardHeight, wizardInseam, wizardWeight, wizardBudget, productsData]);
+  }, [wizardAge, wizardHeight, wizardInseam, wizardWeight, wizardBudget, wizardScenario, productsData]);
 
   // Synchronize wizard values back to main core childProfile
   const handleApplyWizardToProfile = () => {
@@ -131,13 +158,13 @@ export default function GuidesSection({
           Part 1: 智能选购匹配工效算力工具 (Interactive Match Wizard)
           ======================================================== */}
       <section className="bg-gradient-to-br from-slate-900 to-slate-950 border border-amber-500/10 rounded-3xl p-6 sm:p-8 shadow-xl">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 pb-4 border-b border-slate-800/60 pb-6 mb-6">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-slate-800/60 pb-6 mb-6">
           <div className="space-y-1.5 text-left">
             <span className="px-2.5 py-1 bg-amber-500/10 border border-amber-500/30 text-amber-400 text-xs font-black rounded-lg uppercase tracking-wider block w-max">
               WIZARD · 工效智能匹配
             </span>
             <h3 className="text-xl font-extrabold text-white flex items-center gap-2">
-              <Calculator className="w-5.5 h-5.5 text-amber-500" />
+              <Calculator className="w-5 h-5 text-amber-500" />
               童车参数匹配智敏算力箱
             </h3>
             <p className="text-xs text-slate-400">输入您家宝宝的真实身体特征值，我们将自动计算符合医学规范的安全轮径与最高车重死线</p>
@@ -466,7 +493,7 @@ export default function GuidesSection({
           
           <div className="text-center max-w-2xl mx-auto space-y-2">
             <h2 className="text-xl font-black text-white flex items-center justify-center gap-2">
-              <BookOpen className="w-5.5 h-5.5 text-amber-500" />
+              <BookOpen className="w-5 h-5 text-amber-500" />
               科学避坑指南与科普专区
             </h2>
             <p className="text-xs text-slate-400">
