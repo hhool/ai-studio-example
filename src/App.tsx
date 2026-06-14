@@ -163,6 +163,7 @@ export default function App() {
   const [isSearchFocused, setIsSearchFocused] = useState<boolean>(false);
   const [globalSearchTerm, setGlobalSearchTerm] = useState<string>("");
   const [suggestions, setSuggestions] = useState<Product[]>([]);
+  const [highlightedIndex, setHighlightedIndex] = useState<number>(-1);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [userInput, setUserInput] = useState<string>("");
   const [isAiLoading, setIsAiLoading] = useState<boolean>(false);
@@ -179,8 +180,10 @@ export default function App() {
         p.category.toLowerCase().includes(term)
       ).slice(0, 5);
       setSuggestions(filtered);
+      setHighlightedIndex(-1);
     } else {
       setSuggestions([]);
+      setHighlightedIndex(-1);
     }
   }, [globalSearchTerm]);
 
@@ -417,9 +420,20 @@ Would you like to compare brands like Woom, Specialized, or Decathlon, or should
                   onFocus={() => setIsSearchFocused(true)}
                   onBlur={() => setTimeout(() => setIsSearchFocused(false), 200)}
                   className={`pl-10 pr-0 py-2 bg-slate-100 border-transparent transition-all duration-500 ease-out focus:bg-white focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 rounded-xl text-xs font-medium outline-none cursor-pointer focus:cursor-text focus:pr-4 ${isSearchFocused ? "w-64" : "w-10"}`}
-                  onKeyUp={(e) => {
-                    if (e.key === "Enter") {
-                      setActiveTab("products");
+                  onKeyDown={(e) => {
+                    if (e.key === "ArrowDown") {
+                      setHighlightedIndex(prev => (prev < suggestions.length - 1 ? prev + 1 : prev));
+                    } else if (e.key === "ArrowUp") {
+                      setHighlightedIndex(prev => (prev > 0 ? prev - 1 : -1));
+                    } else if (e.key === "Enter") {
+                      if (highlightedIndex >= 0 && highlightedIndex < suggestions.length) {
+                        handleSuggestionClick(suggestions[highlightedIndex]);
+                      } else {
+                        setActiveTab("products");
+                        setIsSearchFocused(false);
+                      }
+                    } else if (e.key === "Escape") {
+                      setIsSearchFocused(false);
                     }
                   }}
                 />
@@ -427,11 +441,12 @@ Would you like to compare brands like Woom, Specialized, or Decathlon, or should
                 {/* Autocomplete Dropdown */}
                 {isSearchFocused && suggestions.length > 0 && (
                   <div className="absolute top-full mt-2 left-0 w-64 bg-white border border-slate-100 rounded-2xl shadow-2xl overflow-hidden z-50 animate-in fade-in slide-in-from-top-2 duration-200">
-                    {suggestions.map((p) => (
+                    {suggestions.map((p, idx) => (
                       <button
                         key={p.id}
                         onClick={() => handleSuggestionClick(p)}
-                        className="w-full px-4 py-3 text-left hover:bg-slate-50 flex items-center gap-3 transition-colors border-b border-slate-50 last:border-0"
+                        onMouseEnter={() => setHighlightedIndex(idx)}
+                        className={`w-full px-4 py-3 text-left flex items-center gap-3 transition-colors border-b border-slate-50 last:border-0 ${highlightedIndex === idx ? "bg-orange-50" : "hover:bg-slate-50"}`}
                       >
                         <div className="w-8 h-8 bg-slate-50 rounded-lg flex items-center justify-center shrink-0">
                           <img src={p.imageUrl} alt={p.name} className="w-6 h-6 object-contain" referrerPolicy="no-referrer" />

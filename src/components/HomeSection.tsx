@@ -12,10 +12,13 @@ import {
   Zap,
   Globe,
   Bell,
-  ArrowRight
+  ArrowRight,
+  Target
 } from "lucide-react";
+import { useState } from "react";
 import { Product } from "../types";
 import { translations, translateProduct } from "../lib/translate";
+import MatchingWizard from "./MatchingWizard";
 
 interface HomeSectionProps {
   productsData: Product[];
@@ -36,6 +39,7 @@ export default function HomeSection({
 }: HomeSectionProps) {
   
   const t = translations[lang];
+  const [isWizardOpen, setIsWizardOpen] = useState(false);
 
   // Outstanding Selection (high scores)
   const topSelections = productsData.sort((a, b) => b.overallScore - a.overallScore).slice(0, 4);
@@ -78,6 +82,22 @@ export default function HomeSection({
               ? "KIDSMOBI 是全球领先的高端童车垂直评测平台，通过力学公式与数千小时的实测，协助家长完成每一个理性的消费决策。"
               : "KIDSMOBI is a global leading evaluation platform for premium kids mobility. We help parents make rational decisions through mechanical physics."}
           </p>
+          <div className="flex flex-wrap justify-center gap-4 pt-4">
+            <button 
+              onClick={() => setIsWizardOpen(true)}
+              className="px-8 py-4 bg-orange-500 hover:bg-orange-600 text-white font-black rounded-2xl transition-all flex items-center gap-2 shadow-xl shadow-orange-500/20 active:scale-95 group"
+            >
+              <Sparkles className="w-5 h-5 group-hover:animate-pulse" />
+              {lang === "zh" ? "智能匹配向导" : "Smart Match Wizard"}
+            </button>
+            <button 
+              onClick={() => setActiveTab("guides")}
+              className="px-8 py-4 bg-white/10 hover:bg-white/20 text-white font-black border border-white/20 rounded-2xl transition-all flex items-center gap-2 active:scale-95"
+            >
+              {lang === "zh" ? "手动选型计算" : "Manual Calculator"}
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
           <div className="flex flex-wrap justify-center gap-4 pt-4">
             {['ISO 8098', 'CPSC', 'EN 71', 'GB-14746'].map(cert => (
               <span key={cert} className="px-4 py-2 bg-white/5 border border-white/10 rounded-xl text-[10px] font-bold text-slate-500 uppercase tracking-widest">{cert}</span>
@@ -271,6 +291,16 @@ export default function HomeSection({
         </div>
       </section>
 
+      <MatchingWizard 
+        isOpen={isWizardOpen}
+        onClose={() => setIsWizardOpen(false)}
+        productsData={productsData}
+        onSelectProduct={(p) => {
+          setIsWizardOpen(false);
+          onSelectProduct(p);
+        }}
+        lang={lang}
+      />
     </div>
   );
 }
