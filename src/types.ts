@@ -12,77 +12,144 @@ export type ProductCategory =
   | "tricycle" 
   | "safety_seat";
 
+export type ComplianceTag = "CCC" | "EN1888" | "ASTM" | "GS";
+
+export interface SEOConfig {
+  title: string;
+  description: string;
+  keywords: string[];
+}
+
+export interface RadarScores {
+  safety: number;
+  comfort: number;
+  portability: number;
+  features: number;
+  valueForMoney: number;
+}
+
 export interface Product {
   id: string;
   name: string;
   brand: string;
   category: ProductCategory;
-  wheelSize: string; // e.g. "12寸", "14寸", "16寸", "20寸", "无"
-  weight: number; // in kg
-  material: string; // e.g., "航天级6061铝合金", "高端镁合金", "超轻碳纤维", "高碳钢"
-  brakeType: string; // e.g., "微调短距双手刹(V刹)", "油压双碟刹", "脚踏倒刹(不推荐)", "脚踩后轮重力刹"
-  tireType: string; // e.g., "越野充气橡胶胎", "EVA轻质发泡胎", "PU轮夜光减震胎"
-  price: number; // e.g. 1299 (in CNY)
-  ageRange: string; // e.g., "3 - 5 岁"
-  heightRange: [number, number]; // e.g., [95, 115] in cm
-  safetyCertification: string[]; // e.g., ["CPSC (美标)", "EN71 (欧标)", "GB 14746 (国标)"]
-  safetyScore: number; // 0 - 10
-  geometryScore: number; // 0 - 10 (Ergonomics, seat tube angle, bottom bracket spacing)
-  weightScore: number; // 0 - 10 (Weight efficiency ratio)
-  overallScore: number; // 0 - 10
-  pros: string[];
-  cons: string[];
-  editorVerdict: string; // Final word from third-party experts
+  wheelSize: string;
+  weight: number; 
+  material: string;
+  brakeType: string;
+  tireType: string;
+  price: number;
+  ageRange: string;
+  heightRange: [number, number];
+  compliance: ComplianceTag[];
   imageUrl: string;
   galleryUrls?: string[];
-  videoUrl?: string; // YouTube or direct MP4 URL
-  status?: "draft" | "published" | "archived";
-}
-
-export interface CMSProduct extends Omit<Product, "name" | "description" | "pros" | "cons" | "editorVerdict"> {
-  zh: {
-    name: string;
-    description: string;
-    pros: string[];
-    cons: string[];
-    editorVerdict: string;
-    brandText?: string;
-  };
-  en: {
-    name: string;
-    description: string;
-    pros: string[];
-    cons: string[];
-    editorVerdict: string;
-    brandText?: string;
-  };
-}
-
-export interface CMSContent {
-  id: string;
-  type: "news" | "guide";
-  category: string;
+  videoUrl?: string;
   status: "draft" | "published" | "archived";
-  imageUrl?: string;
-  date: string;
+}
+
+export interface CMSProduct extends Product {
   zh: {
-    title: string;
-    content: string;
-    author?: string;
+    name: string;
+    description: string;
+    brandText?: string;
+    specsText?: string;
   };
   en: {
-    title: string;
-    content: string;
-    author?: string;
+    name: string;
+    description: string;
+    brandText?: string;
+    specsText?: string;
   };
   updatedAt: any;
 }
 
+export interface Evaluation {
+  id: string;
+  productId: string; // Mandatory link
+  status: "draft" | "published" | "archived";
+  version: string; // e.g. "V1.1"
+  scores: RadarScores;
+  imageUrl: string;
+  zh: {
+    title: string;
+    verdict: string;
+    pros: string[];
+    cons: string[];
+    changelog: string;
+  };
+  en: {
+    title: string;
+    verdict: string;
+    pros: string[];
+    cons: string[];
+    changelog: string;
+  };
+  updatedAt: any;
+}
+
+export interface RiskCard {
+  title: string;
+  pattern: string;
+  detection: string;
+  advice: string;
+}
+
+export interface Guide {
+  id: string;
+  category: string;
+  status: "draft" | "published" | "archived";
+  imageUrl: string;
+  riskCards: RiskCard[];
+  seo: {
+    zh: SEOConfig;
+    en: SEOConfig;
+  };
+  zh: {
+    title: string;
+    content: string; // Rich text
+  };
+  en: {
+    title: string;
+    content: string;
+  };
+  updatedAt: any;
+}
+
+export interface News {
+  id: string;
+  category: string;
+  status: "draft" | "published" | "archived";
+  imageUrl: string;
+  seo: {
+    zh: SEOConfig;
+    en: SEOConfig;
+  };
+  zh: {
+    title: string;
+    content: string;
+  };
+  en: {
+    title: string;
+    content: string;
+  };
+  updatedAt: any;
+}
+
+export interface HomeSlot {
+  id: string;
+  type: "review" | "product" | "guide";
+  targetId: string;
+  imageOverride?: string;
+}
+
 export interface CMSSettings {
   id: "global";
-  heroZh: { title: string; subtitle: string };
-  heroEn: { title: string; subtitle: string };
-  announcement?: { zh: string; en: string };
+  hero: {
+    zh: { title: string; subtitle: string };
+    en: { title: string; subtitle: string };
+  };
+  homeSlots: HomeSlot[]; // For the drag-and-drop recommender
 }
 
 export interface CurrencyData {

@@ -1,95 +1,59 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // 1. Global Safety Net Default Deny
+    // Catch-all deny
     match /{document=**} {
       allow read, write: if false;
     }
 
-    // Primitive definitions
+    // Helpers
     function isSignedIn() {
       return request.auth != null;
     }
-
-    function isOwner(userId) {
-      return isSignedIn() && request.auth.uid == userId;
-    }
-
-    function isValidId(id) {
-      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
-    }
-
+    
     function isAdmin() {
       return isSignedIn() && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
     }
 
-    // Entity validator: User Profile
-    function isValidUser(user) {
-      return user.keys().hasAll(['userId', 'email'])
-          && user.keys().size() == 2
-          && user.userId == request.auth.uid
-          && user.email is string
-          && user.email.size() <= 256;
+    function isPublished() {
+      return resource.data.status == "published";
     }
 
-    // Entity validator: CMS Product
-    function isValidCMSProduct(product) {
-       return product.keys().hasAll(['id', 'category', 'status', 'zh', 'en', 'updatedAt'])
-           && product.id is string
-           && product.category is string
-           && product.status in ['draft', 'published', 'archived']
-           && product.zh is map
-           && product.en is map
-           && product.updatedAt == request.time;
+    // Admin List
+    match /admins/{userId} {
+      allow read: if isSignedIn() && request.auth.uid == userId;
+      // Bootstrapped in service, but rules protect subsequent modifications
+      allow write: if false; 
     }
 
-    // Entity validator: CMS Content
-    function isValidCMSContent(content) {
-       return content.keys().hasAll(['id', 'type', 'status', 'zh', 'en', 'updatedAt'])
-           && content.id is string
-           && content.type in ['news', 'guide']
-           && content.status in ['draft', 'published', 'archived']
-           && content.zh is map
-           && content.en is map
-           && content.updatedAt == request.time;
-    }
-
-    // Match rules for user accounts and subcollections
-    match /users/{userId} {
-      allow get: if isOwner(userId);
-      allow create: if isOwner(userId) && isValidUser(request.resource.data);
-      allow update: if isOwner(userId) && isValidUser(request.resource.data) && request.resource.data.email == resource.data.email;
-      allow delete: if false;
-
-      match /bookmarks/{bookmarkId} {
-        allow list, get: if isOwner(userId);
-        allow create: if isOwner(userId) && isValidId(bookmarkId) && isValidBookmark(request.resource.data);
-        allow delete: if isOwner(userId) && isValidId(bookmarkId);
-        allow update: if false;
-      }
-    }
-
-    // CMS Collections
+    // Products
     match /products/{productId} {
-      allow list, get: if isAdmin() || (resource != null && resource.data.status == 'published');
-      allow create, update: if isAdmin() && isValidId(productId) && isValidCMSProduct(request.resource.data);
-      allow delete: if false; // SEO Protection: Use logic delete (status = archived)
+      allow read: if isPublished() || isAdmin();
+      allow write: if isAdmin();
     }
 
-    match /content/{contentId} {
-      allow list, get: if isAdmin() || (resource != null && resource.data.status == 'published');
-      allow create, update: if isAdmin() && isValidId(contentId) && isValidCMSContent(request.resource.data);
-      allow delete: if false; // SEO Protection
+    // Evaluations
+    match /evaluations/{evalId} {
+      allow read: if isPublished() || isAdmin();
+      allow write: if isAdmin();
     }
 
+    // Guides
+    match /guides/{guideId} {
+      allow read: if isPublished() || isAdmin();
+      allow write: if isAdmin();
+    }
+
+    // News
+    match /news/{newsId} {
+      allow read: if isPublished() || isAdmin();
+      allow write: if isAdmin();
+    }
+
+    // Settings
     match /settings/{settingId} {
-      allow get: if true;
-      allow create, update: if isAdmin();
-    }
-
-    match /admins/{adminId} {
-      allow get: if isSignedIn();
-      allow write: if false; // Managed via console or CLI for security
+      allow read: if true;
+      allow write: if isAdmin();
     }
   }
 }

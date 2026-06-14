@@ -1,94 +1,98 @@
 {
   "entities": {
-    "User": {
-      "title": "User Profile",
-      "description": "User account details",
+    "Admin": {
+      "title": "Admin User",
+      "description": "Administrator account with CMS access",
       "type": "object",
       "properties": {
         "userId": { "type": "string" },
         "email": { "type": "string" },
-        "createdAt": { "type": "string", "format": "date-time" }
+        "role": { "type": "string", "enum": ["superadmin", "editor"] }
       },
       "required": ["userId", "email"]
     },
-    "Bookmark": {
-      "title": "Baby Bike Bookmark",
-      "description": "Product bookmarked by user",
-      "type": "object",
-      "properties": {
-        "productId": { "type": "string" },
-        "userId": { "type": "string" },
-        "createdAt": { "type": "string", "format": "date-time" }
-      },
-      "required": ["productId", "userId", "createdAt"]
-    },
-    "CMSProduct": {
-      "title": "CMS Product",
-      "description": "Multilingual structured product data",
+    "Product": {
+      "title": "Stroller Product",
+      "description": "Structured product data for stroller database",
       "type": "object",
       "properties": {
         "id": { "type": "string" },
         "brand": { "type": "string" },
         "category": { "type": "string" },
+        "status": { "type": "string", "enum": ["draft", "published", "archived"] },
         "price": { "type": "number" },
         "weight": { "type": "number" },
-        "imageUrl": { "type": "string" },
-        "status": { "type": "string" },
+        "compliance": { "type": "array", "items": { "type": "string" } },
         "zh": { "type": "object" },
         "en": { "type": "object" },
-        "updatedAt": { "type": "string", "format": "date-time" }
+        "updatedAt": { "type": "object" }
       },
-      "required": ["id", "category", "status", "zh", "en", "updatedAt"]
+      "required": ["id", "brand", "status"]
     },
-    "CMSContent": {
-      "title": "CMS Content",
-      "description": "News or Guide multilingual content",
+    "Evaluation": {
+      "title": "Evaluation Report",
+      "description": "5D scientific review and radar scores",
       "type": "object",
       "properties": {
         "id": { "type": "string" },
-        "type": { "type": "string" },
-        "category": { "type": "string" },
+        "productId": { "type": "string" },
         "status": { "type": "string" },
+        "version": { "type": "string" },
+        "scores": { "type": "object" },
         "zh": { "type": "object" },
         "en": { "type": "object" },
-        "updatedAt": { "type": "string", "format": "date-time" }
+        "updatedAt": { "type": "object" }
       },
-      "required": ["id", "type", "status", "zh", "en", "updatedAt"]
+      "required": ["id", "productId", "scores"]
     },
-    "CMSSettings": {
-      "title": "CMS Global Settings",
-      "description": "Global multilingual site settings",
+    "Guide": {
+      "title": "Buying Guide",
+      "description": "Long-form guides with risk cards and SEO",
       "type": "object",
       "properties": {
-        "heroZh": { "type": "object" },
-        "heroEn": { "type": "object" }
-      }
+        "id": { "type": "string" },
+        "status": { "type": "string" },
+        "riskCards": { "type": "array" },
+        "seo": { "type": "object" },
+        "zh": { "type": "object" },
+        "en": { "type": "object" },
+        "updatedAt": { "type": "object" }
+      },
+      "required": ["id", "status"]
+    },
+    "News": {
+      "title": "Global News",
+      "description": "Industry trends and policy alerts",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "category": { "type": "string" },
+        "status": { "type": "string" },
+        "seo": { "type": "object" },
+        "zh": { "type": "object" },
+        "en": { "type": "object" },
+        "updatedAt": { "type": "object" }
+      },
+      "required": ["id", "category"]
+    },
+    "Settings": {
+      "title": "CMS Settings",
+      "description": "Global config and homepage slots",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "hero": { "type": "object" },
+        "homeSlots": { "type": "array" }
+      },
+      "required": ["id"]
     }
   },
   "firestore": {
-    "/users/{userId}": {
-      "schema": "User",
-      "description": "User profile metadata"
-    },
-    "/users/{userId}/bookmarks/{bookmarkId}": {
-      "schema": "Bookmark",
-      "description": "Saved products for the user"
-    },
-    "/products/{productId}": {
-      "schema": "CMSProduct",
-      "description": "Global products managed via CMS"
-    },
-    "/content/{contentId}": {
-      "schema": "CMSContent",
-      "description": "News and Guides managed via CMS"
-    },
-    "/settings/{settingId}": {
-      "schema": "CMSSettings",
-      "description": "Global app settings"
-    },
-    "/admins/{adminId}": {
-      "schema": "User",
-      "description": "Whitelisted admin users"
-    }
+    "/admins/{userId}": { "schema": "Admin", "description": "Admin access control list" },
+    "/products/{productId}": { "schema": "Product", "description": "Stroller product catalog" },
+    "/evaluations/{evalId}": { "schema": "Evaluation", "description": "Evaluation reports" },
+    "/guides/{guideId}": { "schema": "Guide", "description": "Buying guides" },
+    "/news/{newsId}": { "schema": "News", "description": "Press releases and news" },
+    "/settings/{settingId}": { "schema": "Settings", "description": "Global application configuration" }
   }
 }

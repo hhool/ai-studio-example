@@ -12,14 +12,12 @@ import {
   deleteDoc
 } from "firebase/firestore";
 import { db, auth } from "./firebase";
-import { CMSProduct, CMSContent, CMSSettings } from "../types";
+import { CMSProduct, Evaluation, Guide, News, CMSSettings } from "../types";
 
 export async function checkIsAdmin(uid: string): Promise<boolean> {
   if (!uid) return false;
-  // Special bootstrap for the developer email
   const currentUser = auth.currentUser;
   if (currentUser?.email === "hhool.student@gmail.com") {
-    // If it's the bootstrap admin, ensure the record exists
     const adminDoc = doc(db, "admins", uid);
     const snap = await getDoc(adminDoc);
     if (!snap.exists()) {
@@ -48,20 +46,47 @@ export async function saveCMSProduct(product: CMSProduct) {
   });
 }
 
-// Content Management (News/Guides)
-export async function getCMSContent(type?: "news" | "guide"): Promise<CMSContent[]> {
-  let q = query(collection(db, "content"), orderBy("updatedAt", "desc"));
-  if (type) {
-    q = query(collection(db, "content"), where("type", "==", type), orderBy("updatedAt", "desc"));
-  }
+// Evaluation Management
+export async function getCMSEvaluations(): Promise<Evaluation[]> {
+  const q = query(collection(db, "evaluations"), orderBy("updatedAt", "desc"));
   const snap = await getDocs(q);
-  return snap.docs.map(d => d.data() as CMSContent);
+  return snap.docs.map(d => d.data() as Evaluation);
 }
 
-export async function saveCMSContent(content: CMSContent) {
-  const cDoc = doc(db, "content", content.id);
-  await setDoc(cDoc, {
-    ...content,
+export async function saveCMSEvaluation(ev: Evaluation) {
+  const eDoc = doc(db, "evaluations", ev.id);
+  await setDoc(eDoc, {
+    ...ev,
+    updatedAt: serverTimestamp()
+  });
+}
+
+// Guide Management
+export async function getCMSGuides(): Promise<Guide[]> {
+  const q = query(collection(db, "guides"), orderBy("updatedAt", "desc"));
+  const snap = await getDocs(q);
+  return snap.docs.map(d => d.data() as Guide);
+}
+
+export async function saveCMSGuide(guide: Guide) {
+  const gDoc = doc(db, "guides", guide.id);
+  await setDoc(gDoc, {
+    ...guide,
+    updatedAt: serverTimestamp()
+  });
+}
+
+// News Management
+export async function getCMSNews(): Promise<News[]> {
+  const q = query(collection(db, "news"), orderBy("updatedAt", "desc"));
+  const snap = await getDocs(q);
+  return snap.docs.map(d => d.data() as News);
+}
+
+export async function saveCMSNews(news: News) {
+  const nDoc = doc(db, "news", news.id);
+  await setDoc(nDoc, {
+    ...news,
     updatedAt: serverTimestamp()
   });
 }
