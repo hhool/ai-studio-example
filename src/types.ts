@@ -41,11 +41,20 @@ export interface Product {
   price: number;
   ageRange: string;
   heightRange: [number, number];
-  compliance: ComplianceTag[];
+  compliance?: ComplianceTag[];
   imageUrl: string;
   galleryUrls?: string[];
   videoUrl?: string;
-  status: "draft" | "published" | "archived";
+  status?: "draft" | "published" | "archived";
+  // Added evaluation fields for summary views
+  overallScore?: number;
+  safetyScore?: number;
+  weightScore?: number;
+  geometryScore?: number;
+  pros?: string[];
+  cons?: string[];
+  safetyCertification?: string[];
+  editorVerdict?: string;
 }
 
 export interface CMSProduct extends Product {

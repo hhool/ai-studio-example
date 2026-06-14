@@ -467,6 +467,7 @@ Would you like to compare brands like Woom, Specialized, or Decathlon, or should
                 { id: "guides", label: t.navGuides },
                 { id: "news", label: t.navNews },
                 { id: "about", label: t.navAbout },
+                ...(isAdmin ? [{ id: "admin", label: lang === "zh" ? "管理后台" : "Admin" }] : []),
               ].map(tab => (
                 <button
                   key={tab.id}

@@ -14,7 +14,8 @@ import {
   RefreshCw,
   LogOut,
   Sparkles,
-  Trash2
+  Trash2,
+  Settings as SettingsIcon
 } from "lucide-react";
 import { Product, CurrencyData } from "../types";
 import { 
@@ -386,6 +387,16 @@ export default function AuthSection({
                 <span>{isEn ? "Watermark-free laboratory asset logs" : "无水印素材、原声避震过障图"}</span>
               </div>
             </div>
+
+            {userEmail === "hhool.student@gmail.com" && (
+              <button
+                onClick={() => window.location.hash = "cms"}
+                className="w-full py-2.5 bg-orange-500 hover:bg-orange-600 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 shadow-lg shadow-orange-500/20 transition-all border border-orange-400"
+              >
+                <SettingsIcon className="w-4 h-4" />
+                {isEn ? "Open Management Console" : "跳转至管理后台"}
+              </button>
+            )}
 
             <button
               onClick={handleLogOut}
