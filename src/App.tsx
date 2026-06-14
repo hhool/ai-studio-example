@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, FormEvent } from "react";
+import { motion, AnimatePresence } from "motion/react";
 import {
   Baby,
   ShieldCheck,
@@ -23,7 +24,8 @@ import {
   Facebook,
   Youtube,
   Music,
-  X
+  X,
+  ArrowUp
 } from "lucide-react";
 import {
   Radar,
@@ -187,6 +189,21 @@ export default function App() {
   const [isAiLoading, setIsAiLoading] = useState<boolean>(false);
   const [expertNotice, setExpertNotice] = useState<string>("");
   const chatBottomRef = useRef<HTMLDivElement>(null);
+
+  // Scroll to Top state
+  const [showBackToTop, setShowBackToTop] = useState<boolean>(false);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setShowBackToTop(window.scrollY > window.innerHeight);
+    };
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
+  const scrollToTop = () => {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
 
   // Update suggestions based on search term
   useEffect(() => {
@@ -860,6 +877,21 @@ Would you like to compare brands like Woom, Specialized, or Decathlon, or should
         </div>
       </footer>
 
+      {/* Back to Top Button */}
+      <AnimatePresence>
+        {showBackToTop && (
+          <motion.button
+            initial={{ opacity: 0, scale: 0.5, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.5, y: 20 }}
+            onClick={scrollToTop}
+            className="fixed bottom-24 right-8 z-40 p-4 bg-orange-500 text-white rounded-2xl shadow-2xl shadow-orange-500/20 border border-orange-400 hover:bg-orange-600 transition-colors focus:outline-none focus:ring-4 focus:ring-orange-500/20 active:scale-95"
+            title={lang === "en" ? "Back to Top" : "回到顶部"}
+          >
+            <ArrowUp className="w-5 h-5 stroke-[3]" />
+          </motion.button>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
