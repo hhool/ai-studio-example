@@ -20,13 +20,19 @@ export default function AdminPanel({ onClose, onRedirectAuth, lang }: { onClose:
 
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged(async (user) => {
-      if (user) {
-        const admin = await checkIsAdmin(user.uid);
-        setIsAdmin(admin);
-      } else {
+      try {
+        if (user) {
+          const admin = await checkIsAdmin(user.uid);
+          setIsAdmin(admin);
+        } else {
+          setIsAdmin(false);
+        }
+      } catch (error) {
+        console.error("Admin verification failed:", error);
         setIsAdmin(false);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     });
     return () => unsubscribe();
   }, []);

@@ -149,8 +149,13 @@ export default function App() {
         }
 
         // Admin verification logic
-        const adminStatus = await checkIsAdmin(user.uid);
-        setIsAdmin(adminStatus);
+        try {
+          const adminStatus = await checkIsAdmin(user.uid);
+          setIsAdmin(adminStatus);
+        } catch (error) {
+          console.error("Admin check failed:", error);
+          setIsAdmin(false);
+        }
       } else {
         setUserEmail("");
         setSavedProducts([]);

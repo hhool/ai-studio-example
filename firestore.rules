@@ -22,8 +22,8 @@ service cloud.firestore {
     // Admin List
     match /admins/{userId} {
       allow read: if isSignedIn() && request.auth.uid == userId;
-      // Bootstrapped in service, but rules protect subsequent modifications
-      allow write: if false; 
+      // Allow the superadmin to bootstrap their own admin document
+      allow write: if isSignedIn() && request.auth.uid == userId && request.auth.token.email == "hhool.student@gmail.com";
     }
 
     // Products
