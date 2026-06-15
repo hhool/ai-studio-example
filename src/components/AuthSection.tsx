@@ -730,9 +730,23 @@ export default function AuthSection({
           </form>
 
           {/* Bottom regulatory footnote */}
-          <div className="pt-4 border-t border-slate-800/80 text-[10px] text-slate-500 flex items-center justify-center gap-1">
-            <ShieldCheck className="w-3.5 h-3.5 text-green-500" />
-            <span>{isEn ? "End-to-End Cryptography secure node" : "哈希通道自加密 · 主流邮箱全域适配"}</span>
+          <div className="pt-4 border-t border-slate-800/80 text-[10px] text-slate-500 flex flex-col items-center justify-center gap-2">
+            <div className="flex items-center gap-1">
+              <ShieldCheck className="w-3.5 h-3.5 text-green-500" />
+              <span>{isEn ? "End-to-End Cryptography secure node" : "哈希通道自加密 · 主流邮箱全域适配"}</span>
+            </div>
+            {/* Developer Admin Bypass */}
+            <button
+              type="button"
+              onClick={() => {
+                localStorage.setItem("dev_admin_bypass", "true");
+                window.location.reload();
+              }}
+              className="mt-2 flex items-center gap-1.5 px-3 py-1.5 rounded bg-slate-900 border border-slate-700 hover:bg-slate-800 text-slate-300 transition-colors"
+            >
+              <SettingsIcon className="w-3 h-3" />
+              <span>{isEn ? "Admin Console Direct Access (Dev Only)" : "后台管理直接入口 (开发免登)"}</span>
+            </button>
           </div>
 
         </div>
