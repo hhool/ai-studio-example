@@ -7,15 +7,15 @@ import {
   collection, 
   serverTimestamp 
 } from "firebase/firestore";
-import { handleFirestoreError, OperationType } from "./firestoreHelper";
+import { handleFirestoreError, OperationType, withTimeout } from "./firestoreHelper";
 
 export async function ensureUserProfileInFirestore(userId: string, email: string) {
   const path = `users/${userId}`;
   try {
-    await setDoc(doc(db, "users", userId), {
+    await withTimeout(setDoc(doc(db, "users", userId), {
       userId,
       email,
-    }, { merge: true });
+    }, { merge: true }));
   } catch (error) {
     handleFirestoreError(error, OperationType.WRITE, path);
   }
@@ -24,11 +24,11 @@ export async function ensureUserProfileInFirestore(userId: string, email: string
 export async function addBookmarkToFirestore(userId: string, productId: string) {
   const path = `users/${userId}/bookmarks/${productId}`;
   try {
-    await setDoc(doc(db, "users", userId, "bookmarks", productId), {
+    await withTimeout(setDoc(doc(db, "users", userId, "bookmarks", productId), {
       productId,
       userId,
       createdAt: serverTimestamp(),
-    });
+    }));
   } catch (error) {
     handleFirestoreError(error, OperationType.WRITE, path);
   }
@@ -37,7 +37,7 @@ export async function addBookmarkToFirestore(userId: string, productId: string) 
 export async function removeBookmarkFromFirestore(userId: string, productId: string) {
   const path = `users/${userId}/bookmarks/${productId}`;
   try {
-    await deleteDoc(doc(db, "users", userId, "bookmarks", productId));
+    await withTimeout(deleteDoc(doc(db, "users", userId, "bookmarks", productId)));
   } catch (error) {
     handleFirestoreError(error, OperationType.DELETE, path);
   }

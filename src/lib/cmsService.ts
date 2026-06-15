@@ -13,7 +13,7 @@ import {
 } from "firebase/firestore";
 import { db, auth } from "./firebase";
 import { CMSProduct, Evaluation, Guide, News, CMSSettings } from "../types";
-import { handleFirestoreError, OperationType } from "./firestoreHelper";
+import { handleFirestoreError, OperationType, withTimeout } from "./firestoreHelper";
 
 import { User } from "firebase/auth";
 
@@ -104,7 +104,7 @@ export async function saveCMSProduct(product: CMSProduct) {
       ...product,
       updatedAt: serverTimestamp()
     });
-    await setDoc(pDoc, purified);
+    await withTimeout(setDoc(pDoc, purified));
   } catch (error) {
     handleFirestoreError(error, OperationType.WRITE, path);
   }
@@ -178,7 +178,7 @@ export async function saveCMSEvaluation(ev: Evaluation) {
       ...ev,
       updatedAt: serverTimestamp()
     });
-    await setDoc(eDoc, purified);
+    await withTimeout(setDoc(eDoc, purified));
   } catch (error) {
     handleFirestoreError(error, OperationType.WRITE, path);
   }
@@ -210,7 +210,7 @@ export async function saveCMSGuide(guide: Guide) {
       ...guide,
       updatedAt: serverTimestamp()
     });
-    await setDoc(gDoc, purified);
+    await withTimeout(setDoc(gDoc, purified));
   } catch (error) {
     handleFirestoreError(error, OperationType.WRITE, path);
   }
@@ -242,7 +242,7 @@ export async function saveCMSNews(news: News) {
       ...news,
       updatedAt: serverTimestamp()
     });
-    await setDoc(nDoc, purified);
+    await withTimeout(setDoc(nDoc, purified));
   } catch (error) {
     handleFirestoreError(error, OperationType.WRITE, path);
   }
@@ -266,7 +266,7 @@ export async function saveCMSSettings(settings: CMSSettings) {
   try {
     const sDoc = doc(db, "settings", "global");
     const purified = cleanUndefinedValues(settings);
-    await setDoc(sDoc, purified);
+    await withTimeout(setDoc(sDoc, purified));
   } catch (error) {
     handleFirestoreError(error, OperationType.WRITE, path);
   }

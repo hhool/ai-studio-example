@@ -87,8 +87,16 @@ export default function ProductManager({ lang }: { lang: "zh" | "en" }) {
 
   const handleDelete = async (id: string) => {
     if (confirm("Are you sure you want to delete this product?")) {
-      await deleteDoc(doc(db, "products", id));
-      fetchProducts();
+      try {
+        await Promise.race([
+          deleteDoc(doc(db, "products", id)),
+          new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout deleting item.")), 5000))
+        ]);
+        fetchProducts();
+      } catch (e: any) {
+        console.error(e);
+        alert("Failed to delete: " + (e.message || String(e)));
+      }
     }
   };
 
