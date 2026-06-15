@@ -53,15 +53,36 @@ export default function ProductManager({ lang }: { lang: "zh" | "en" }) {
     });
   };
 
+  const [saving, setSaving] = useState(false);
+
   const handleSave = async (p: CMSProduct) => {
     // Basic Quality Check
     if (!p.zh.name || !p.en.name) {
       alert("Please enter product name in both languages.");
       return;
     }
-    await saveCMSProduct(p);
-    setEditingProduct(null);
-    fetchProducts();
+    setSaving(true);
+    try {
+      await saveCMSProduct(p);
+      setEditingProduct(null);
+      fetchProducts();
+    } catch (e: any) {
+      console.error(e);
+      let errorMsg = e.message || String(e);
+      if (errorMsg.includes("Missing or insufficient permissions")) {
+        alert(
+          lang === "zh"
+            ? "❌ 保存失败：您当前可能没有在 Firebase Auth 进行真实安全登录（请确保您在“我的账户”进行了 Google 账号登录）。本地开发者 bypass 模式仅用于浏览，无法直接对云数据库进行写操作。"
+            : "❌ Save failed: You might not be securely signed in to Firebase Auth. Check your profile in the Account section and authenticate via Google popup. Developer bypass is read-only on the cloud DB."
+        );
+      } else {
+        alert(
+          (lang === "zh" ? "❌ 保存出错: " : "❌ Save Error: ") + errorMsg
+        );
+      }
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleDelete = async (id: string) => {
@@ -146,6 +167,7 @@ export default function ProductManager({ lang }: { lang: "zh" | "en" }) {
           <ProductEditor 
             product={editingProduct} 
             onSave={handleSave} 
+            saving={saving}
             onCancel={() => setEditingProduct(null)} 
             lang={lang} 
           />
@@ -155,7 +177,7 @@ export default function ProductManager({ lang }: { lang: "zh" | "en" }) {
   );
 }
 
-function ProductEditor({ product, onSave, onCancel, lang }: any) {
+function ProductEditor({ product, onSave, onCancel, lang, saving }: any) {
   const [formData, setFormData] = useState<CMSProduct>(product);
   const [activeTab, setActiveTab] = useState<"base" | "zh" | "en" | "compare">("compare");
 
@@ -183,13 +205,23 @@ function ProductEditor({ product, onSave, onCancel, lang }: any) {
             <p className="text-xs text-slate-500 font-bold uppercase tracking-widest mt-1">Structured Mirroring Mode Active</p>
           </div>
           <div className="flex items-center gap-4">
-            <button onClick={onCancel} className="px-8 py-3 text-slate-400 font-black hover:text-slate-900 transition-colors">Abort</button>
+            <button onClick={onCancel} disabled={saving} className="px-8 py-3 text-slate-400 font-black hover:text-slate-900 transition-colors disabled:opacity-50">Abort</button>
             <button 
               onClick={() => onSave(formData)}
-              className="px-8 py-3 bg-slate-900 text-white rounded-2xl font-black flex items-center gap-2 shadow-xl shadow-slate-900/10 hover:bg-orange-500 transition-all"
+              disabled={saving}
+              className="px-8 py-3 bg-slate-900 text-white rounded-2xl font-black flex items-center gap-2 shadow-xl shadow-slate-900/10 hover:bg-orange-500 transition-all disabled:bg-slate-200 disabled:text-slate-400 cursor-pointer"
             >
-              <Save className="w-5 h-5 text-orange-400" />
-              Publish Changes
+              {saving ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-slate-400 border-t-white rounded-full animate-spin" />
+                  <span>{lang === "zh" ? "发布中..." : "Publishing..."}</span>
+                </>
+              ) : (
+                <>
+                  <Save className="w-5 h-5 text-orange-400" />
+                  <span>{lang === "zh" ? "保存并发布" : "Publish Changes"}</span>
+                </>
+              )}
             </button>
           </div>
         </header>

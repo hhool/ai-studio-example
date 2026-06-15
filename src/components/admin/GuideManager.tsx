@@ -43,10 +43,31 @@ export default function GuideManager({ lang }: { lang: "zh" | "en" }) {
     });
   };
 
+  const [saving, setSaving] = useState(false);
+
   const handleSave = async (g: Guide) => {
-    await saveCMSGuide(g);
-    setEditingGuide(null);
-    fetchData();
+    setSaving(true);
+    try {
+      await saveCMSGuide(g);
+      setEditingGuide(null);
+      fetchData();
+    } catch (e: any) {
+      console.error(e);
+      let errorMsg = e.message || String(e);
+      if (errorMsg.includes("Missing or insufficient permissions")) {
+        alert(
+          lang === "zh"
+            ? "❌ 保存失败：您当前可能没有在 Firebase Auth 进行真实安全登录（请确保您在“我的账户”进行了 Google 账号登录）。本地开发者 bypass 模式仅用于浏览，无法直接对云数据库进行写操作。"
+            : "❌ Save failed: You might not be securely signed in to Firebase Auth. Check your profile in the Account section and authenticate via Google popup. Developer bypass is read-only on the cloud DB."
+        );
+      } else {
+        alert(
+          (lang === "zh" ? "❌ 保存出错: " : "❌ Save Error: ") + errorMsg
+        );
+      }
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -95,6 +116,7 @@ export default function GuideManager({ lang }: { lang: "zh" | "en" }) {
           <GuideEditor 
             guide={editingGuide} 
             onSave={handleSave} 
+            saving={saving}
             onCancel={() => setEditingGuide(null)} 
             lang={lang} 
           />
@@ -104,7 +126,7 @@ export default function GuideManager({ lang }: { lang: "zh" | "en" }) {
   );
 }
 
-function GuideEditor({ guide, onSave, onCancel, lang }: any) {
+function GuideEditor({ guide, onSave, onCancel, lang, saving }: any) {
   const [formData, setFormData] = useState<Guide>(guide);
   const [activeTab, setActiveTab] = useState<"content" | "risk" | "seo">("content");
   const [activeLang, setActiveLang] = useState<"zh" | "en">("zh");
@@ -139,13 +161,23 @@ function GuideEditor({ guide, onSave, onCancel, lang }: any) {
             </div>
           </div>
           <div className="flex items-center gap-4">
-            <button onClick={onCancel} className="px-8 py-3 text-slate-400 font-black hover:text-slate-900 transition-colors">Discard</button>
+            <button onClick={onCancel} disabled={saving} className="px-8 py-3 text-slate-400 font-black hover:text-slate-900 transition-colors disabled:opacity-50">Discard</button>
             <button 
               onClick={() => onSave(formData)}
-              className="px-8 py-3 bg-slate-900 text-white rounded-2xl font-black flex items-center gap-2 shadow-xl shadow-slate-900/10 hover:bg-blue-600 transition-all"
+              disabled={saving}
+              className="px-8 py-3 bg-slate-900 text-white rounded-2xl font-black flex items-center gap-2 shadow-xl shadow-slate-900/10 hover:bg-blue-600 transition-all disabled:bg-slate-200 disabled:text-slate-400 cursor-pointer"
             >
-              <Save className="w-5 h-5 text-blue-400" />
-              Commit Guide
+              {saving ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-slate-400 border-t-white rounded-full animate-spin" />
+                  <span>{lang === "zh" ? "发布中..." : "Publishing..."}</span>
+                </>
+              ) : (
+                <>
+                  <Save className="w-5 h-5 text-blue-400" />
+                  <span>{lang === "zh" ? "保存并发布" : "Commit Guide"}</span>
+                </>
+              )}
             </button>
           </div>
         </header>

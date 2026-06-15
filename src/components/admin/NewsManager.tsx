@@ -41,10 +41,31 @@ export default function NewsManager({ lang }: { lang: "zh" | "en" }) {
     });
   };
 
+  const [saving, setSaving] = useState(false);
+
   const handleSave = async (n: News) => {
-    await saveCMSNews(n);
-    setEditingNews(null);
-    fetchData();
+    setSaving(true);
+    try {
+      await saveCMSNews(n);
+      setEditingNews(null);
+      fetchData();
+    } catch (e: any) {
+      console.error(e);
+      let errorMsg = e.message || String(e);
+      if (errorMsg.includes("Missing or insufficient permissions")) {
+        alert(
+          lang === "zh"
+            ? "❌ 保存失败：您当前可能没有在 Firebase Auth 进行真实安全登录（请确保您在“我的账户”进行了 Google 账号登录）。本地开发者 bypass 模式仅用于浏览，无法直接对云数据库进行写操作。"
+            : "❌ Save failed: You might not be securely signed in to Firebase Auth. Check your profile in the Account section and authenticate via Google popup. Developer bypass is read-only on the cloud DB."
+        );
+      } else {
+        alert(
+          (lang === "zh" ? "❌ 保存出错: " : "❌ Save Error: ") + errorMsg
+        );
+      }
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -93,6 +114,7 @@ export default function NewsManager({ lang }: { lang: "zh" | "en" }) {
           <NewsEditor 
             news={editingNews} 
             onSave={handleSave} 
+            saving={saving}
             onCancel={() => setEditingNews(null)} 
             lang={lang} 
           />
@@ -102,7 +124,7 @@ export default function NewsManager({ lang }: { lang: "zh" | "en" }) {
   );
 }
 
-function NewsEditor({ news, onSave, onCancel, lang }: any) {
+function NewsEditor({ news, onSave, onCancel, lang, saving }: any) {
   const [formData, setFormData] = useState<News>(news);
   const [activeLang, setActiveLang] = useState<"zh" | "en">("zh");
 
@@ -126,13 +148,23 @@ function NewsEditor({ news, onSave, onCancel, lang }: any) {
              </div>
           </div>
           <div className="flex items-center gap-4">
-            <button onClick={onCancel} className="px-6 py-2 text-slate-400 font-black hover:text-slate-900 transition-colors uppercase text-xs">Abort</button>
+            <button onClick={onCancel} disabled={saving} className="px-6 py-2 text-slate-400 font-black hover:text-slate-900 transition-colors uppercase text-xs disabled:opacity-50">Abort</button>
             <button 
               onClick={() => onSave(formData)}
-              className="px-8 py-3 bg-slate-900 text-white rounded-xl font-black flex items-center gap-2 shadow-xl shadow-slate-900/20"
+              disabled={saving}
+              className="px-8 py-3 bg-slate-900 text-white rounded-xl font-black flex items-center gap-2 shadow-xl shadow-slate-900/20 disabled:bg-slate-200 disabled:text-slate-400 cursor-pointer"
             >
-              <Save className="w-4 h-4 text-orange-500" />
-              Publish to Wire
+              {saving ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-slate-400 border-t-white rounded-full animate-spin" />
+                  <span>{lang === "zh" ? "发布中..." : "Publishing..."}</span>
+                </>
+              ) : (
+                <>
+                  <Save className="w-4 h-4 text-orange-500" />
+                  <span>{lang === "zh" ? "发布至资讯流" : "Publish to Wire"}</span>
+                </>
+              )}
             </button>
           </div>
         </header>

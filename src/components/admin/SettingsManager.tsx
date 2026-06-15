@@ -63,10 +63,31 @@ export default function SettingsManager({ lang }: { lang: "zh" | "en" }) {
     setPool(combinedPool);
   };
 
+  const [saving, setSaving] = useState(false);
+
   const handleSave = async () => {
     if (settings) {
-      await saveCMSSettings(settings);
-      alert("Store updated successfully.");
+      setSaving(true);
+      try {
+        await saveCMSSettings(settings);
+        alert(lang === "zh" ? "店铺配置更新成功！" : "Store updated successfully.");
+      } catch (e: any) {
+        console.error(e);
+        let errorMsg = e.message || String(e);
+        if (errorMsg.includes("Missing or insufficient permissions")) {
+          alert(
+            lang === "zh"
+              ? "❌ 更新失败：您当前可能没有在 Firebase Auth 进行真实安全登录（请确保您在“我的账户”进行了 Google 账号登录）。本地开发者 bypass 模式仅用于浏览，无法直接对云数据库进行写操作。"
+              : "❌ Update failed: You might not be securely signed in to Firebase Auth. Check your profile in the Account section and authenticate via Google popup. Developer bypass is read-only on the cloud DB."
+          );
+        } else {
+          alert(
+            (lang === "zh" ? "❌ 更新出错: " : "❌ Update error: ") + errorMsg
+          );
+        }
+      } finally {
+        setSaving(false);
+      }
     }
   };
 
@@ -138,9 +159,22 @@ export default function SettingsManager({ lang }: { lang: "zh" | "en" }) {
           <h2 className="text-3xl font-black text-slate-900 tracking-tighter uppercase">{lang === "zh" ? "首页与全局配置" : "Home & Config"}</h2>
           <p className="text-slate-500 font-medium mt-1">Configure global visual identity and recommendation pools.</p>
         </div>
-        <button onClick={handleSave} className="bg-slate-900 text-white px-8 py-4 rounded-3xl font-black shadow-2xl flex items-center gap-2 hover:bg-orange-500 transition-all">
-          <Save className="w-5 h-5 text-orange-400" />
-          Deploy Changes
+        <button 
+          onClick={handleSave} 
+          disabled={saving}
+          className="bg-slate-900 hover:bg-orange-500 disabled:bg-slate-200 text-white disabled:text-slate-400 px-8 py-4 rounded-3xl font-black shadow-2xl flex items-center gap-2 cursor-pointer transition-all"
+        >
+          {saving ? (
+            <>
+              <div className="w-5 h-5 border-2 border-slate-400 border-t-white rounded-full animate-spin" />
+              <span>{lang === "zh" ? "部署中..." : "Deploying..."}</span>
+            </>
+          ) : (
+            <>
+              <Save className="w-5 h-5 text-orange-400" />
+              <span>{lang === "zh" ? "部署更改" : "Deploy Changes"}</span>
+            </>
+          )}
         </button>
       </header>
 

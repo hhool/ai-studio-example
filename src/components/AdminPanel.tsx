@@ -67,7 +67,16 @@ export default function AdminPanel({
       }
     } catch (e: any) {
       console.error("Force sync failed:", e);
-      alert((lang === "zh" ? "同步出错: " : "Sync Error: ") + (e.message || e));
+      let errorMsg = e.message || String(e);
+      if (errorMsg.includes("Missing or insufficient permissions")) {
+        alert(
+          lang === "zh"
+            ? "❌ 同步失败（权限不足）：您当前可能没有在 Firebase Auth 进行真实安全登录（请确保您在“我的账户”进行了 Google 账号登录）。本地开发者 bypass 模式仅用于浏览，无法直接对云数据库进行写操作。建议您退出并使用 real hhool.student@gmail.com 谷歌账号登录。"
+            : "❌ Sync failed (Missing or insufficient permissions): You might not be securely signed in to Firebase Auth. Check your profile in the Account section and authenticate via Google popup. Developer bypass is read-only on the cloud DB."
+        );
+      } else {
+        alert((lang === "zh" ? "同步出错: " : "Sync Error: ") + errorMsg);
+      }
     } finally {
       setSyncing(false);
     }
@@ -160,6 +169,35 @@ export default function AdminPanel({
         </div>
 
         <div className="p-10 max-w-7xl mx-auto w-full flex-1">
+          {localStorage.getItem("dev_admin_bypass") === "true" && (
+            <div className="mb-8 p-6 bg-amber-50 border border-amber-200 rounded-[28px] shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-4 animate-in fade-in slide-in-from-top-4 duration-500">
+              <div className="flex gap-4">
+                <div className="p-3 bg-amber-100 text-amber-600 rounded-2xl shrink-0">
+                  <ShieldAlert className="w-6 h-6 animate-bounce" />
+                </div>
+                <div>
+                  <h4 className="font-black text-amber-900 text-sm">
+                    {lang === "zh" ? "⚡ 开发者快捷登录模式激活" : "⚡ Developer Bypass Active"}
+                  </h4>
+                  <p className="text-xs text-amber-700/80 mt-1 leading-relaxed max-w-2xl">
+                    {lang === "zh" 
+                      ? "您当前正在使用本地开发者影子账户进行离线预览和浏览。由于未在 Firebase Auth 云端服务中完成 Google 真实鉴权，所有发布和强制同步操作都将被 Firestore 安全规则拒绝。若需持久化发布和同步，请回到首页使用 real hhool.student@gmail.com 谷歌账号登录。"
+                      : "You are active via developer bypass. Since this session is not securely authenticated on the real Firebase Auth backend, database modifications or synces will fail due to Firestore Security Rules. Authenticate via Google profile from Account section to publish edits sustainably."}
+                  </p>
+                </div>
+              </div>
+              <button 
+                onClick={() => {
+                  localStorage.removeItem("dev_admin_bypass");
+                  onClose();
+                  onRedirectAuth();
+                }}
+                className="px-6 py-3 bg-amber-900 hover:bg-amber-950 text-white rounded-2xl text-xs font-black uppercase tracking-wider transition whitespace-nowrap cursor-pointer"
+              >
+                {lang === "zh" ? "立即登录 Google" : "Login Google"}
+              </button>
+            </div>
+          )}
            {activeMenu === "dashboard" && <Dashboard lang={lang} />}
            {activeMenu === "products" && <ProductManager lang={lang} />}
            {activeMenu === "evaluations" && <EvaluationManager lang={lang} />}
