@@ -233,7 +233,7 @@ export default function GuidesSection({
       if (wizardScenario === "tight") {
         isScenarioMatch = p.weight <= perfectWeightLimit || p.category === "scooter" || p.category === "balance";
       } else if (wizardScenario === "rough") {
-        isScenarioMatch = p.tireType.includes("充气") || p.tireType.includes("越野") || p.tireType.includes("橡胶");
+        isScenarioMatch = (p.tireType || "").includes("充气") || (p.tireType || "").includes("越野") || (p.tireType || "").includes("橡胶");
       }
 
       // Heavy/weight safety check

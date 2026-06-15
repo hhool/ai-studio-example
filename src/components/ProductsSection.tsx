@@ -93,7 +93,7 @@ export default function ProductsSection({
           p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
           p.brand.toLowerCase().includes(searchQuery.toLowerCase()) ||
           p.material.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          p.tireType.toLowerCase().includes(searchQuery.toLowerCase());
+          (p.tireType || "").toLowerCase().includes(searchQuery.toLowerCase());
           
         let matchesAge = true;
         if (selectedAge !== "all") {

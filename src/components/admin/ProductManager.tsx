@@ -185,9 +185,10 @@ function ProductEditor({ product, onSave, onCancel, lang, saving }: any) {
   const complianceOptions: ComplianceTag[] = ["CCC", "EN1888", "ASTM", "GS"];
 
   const toggleCompliance = (tag: ComplianceTag) => {
-    const next = formData.compliance.includes(tag)
-      ? formData.compliance.filter(t => t !== tag)
-      : [...formData.compliance, tag];
+    const complianceList = formData.compliance || [];
+    const next = complianceList.includes(tag)
+      ? complianceList.filter(t => t !== tag)
+      : [...complianceList, tag];
     setFormData({ ...formData, compliance: next });
   };
 
@@ -306,7 +307,7 @@ function ProductEditor({ product, onSave, onCancel, lang, saving }: any) {
                      <button 
                         key={tag}
                         onClick={() => toggleCompliance(tag)}
-                        className={`px-8 py-4 rounded-2xl font-black text-xs border-2 transition-all ${formData.compliance.includes(tag) ? "bg-orange-500 border-orange-500 text-white shadow-xl shadow-orange-500/20" : "bg-white border-slate-100 text-slate-400 hover:border-slate-200"}`}
+                        className={`px-8 py-4 rounded-2xl font-black text-xs border-2 transition-all ${(formData.compliance || []).includes(tag) ? "bg-orange-500 border-orange-500 text-white shadow-xl shadow-orange-500/20" : "bg-white border-slate-100 text-slate-400 hover:border-slate-200"}`}
                      >
                        {tag} CERTIFIED
                      </button>

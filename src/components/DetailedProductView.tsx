@@ -97,7 +97,7 @@ export default function DetailedProductView({
   // Function to extract 5-dimension scores
   const getProductScores = (p: Product) => {
     const safety = p.safetyScore;
-    const comfort = p.category === "stroller" ? 10.0 : p.category === "scooter" ? 8.5 : p.tireType.includes("充气") ? 9.5 : 6.0;
+    const comfort = p.category === "stroller" ? 10.0 : p.category === "scooter" ? 8.5 : p.tireType?.includes("充气") ? 9.5 : 6.0;
     const portability = p.weightScore;
     
     // Functionality Score

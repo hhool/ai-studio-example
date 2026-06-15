@@ -15,7 +15,7 @@ interface EvaluationsSectionProps {
 function SafetyRadarChart({ product, lang = "zh" }: { product: Product; lang: "zh" | "en" }) {
   const scores = useMemo(() => {
     // Standardize scores to 0-10 bounds
-    const comfort = product.category === "stroller" ? 10.0 : product.category === "scooter" ? 8.5 : product.tireType.includes("充气") ? 9.5 : 6.0;
+    const comfort = product.category === "stroller" ? 10.0 : product.category === "scooter" ? 8.5 : product.tireType?.includes("充气") ? 9.5 : 6.0;
     const value = product.price < 600 ? 10.0 : product.price < 2000 ? 8.5 : product.price < 4000 ? 7.0 : 5.0;
     
     return [
