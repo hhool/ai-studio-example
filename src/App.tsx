@@ -213,7 +213,30 @@ export default function App() {
 
   // 3. User local bookmarks, up to 3 compares, and session login email
   const [savedProducts, setSavedProducts] = useState<Product[]>([]);
-  const [compareList, setCompareList] = useState<Product[]>([]);
+  const [compareList, setCompareList] = useState<Product[]>(() => {
+    try {
+      const cached = localStorage.getItem("unauth_compare_list");
+      if (cached) {
+        return JSON.parse(cached);
+      }
+    } catch (e) {
+      console.error("Failed to parse unauth_compare_list", e);
+    }
+    return [];
+  });
+
+  const [viewHistory, setViewHistory] = useState<Product[]>(() => {
+    try {
+      const cached = localStorage.getItem("unauth_view_history");
+      if (cached) {
+        return JSON.parse(cached);
+      }
+    } catch (e) {
+      console.error("Failed to parse unauth_view_history", e);
+    }
+    return [];
+  });
+
   const [userEmail, setUserEmail] = useState<string>(() => {
     const isBypass = localStorage.getItem("dev_admin_bypass") === "true";
     return isBypass ? "hhool.student@gmail.com" : "";
@@ -222,6 +245,53 @@ export default function App() {
   // Global CMS settings and Products state
   const [cmsSettings, setCmsSettings] = useState<CMSSettings | null>(null);
   const [productsData, setProductsData] = useState<Product[]>(defaultProductsData);
+
+  // Cache compareList and viewHistory on change and keep them fresh relative to database updates
+  useEffect(() => {
+    try {
+      localStorage.setItem("unauth_compare_list", JSON.stringify(compareList));
+    } catch (e) {
+      console.error("Failed to write to unauth_compare_list", e);
+    }
+  }, [compareList]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("unauth_view_history", JSON.stringify(viewHistory));
+    } catch (e) {
+      console.error("Failed to write to unauth_view_history", e);
+    }
+  }, [viewHistory]);
+
+  useEffect(() => {
+    if (productsData.length > 0) {
+      setCompareList(prev => {
+        let changed = false;
+        const updated = prev.map(item => {
+          const matched = productsData.find(p => p.id === item.id);
+          if (matched && JSON.stringify(matched) !== JSON.stringify(item)) {
+            changed = true;
+            return matched;
+          }
+          return item;
+        });
+        return changed ? updated : prev;
+      });
+
+      setViewHistory(prev => {
+        let changed = false;
+        const updated = prev.map(item => {
+          const matched = productsData.find(p => p.id === item.id);
+          if (matched && JSON.stringify(matched) !== JSON.stringify(item)) {
+            changed = true;
+            return matched;
+          }
+          return item;
+        });
+        return changed ? updated : prev;
+      });
+    }
+  }, [productsData]);
 
   // Load CMS settings and Products on mount / tab change
   useEffect(() => {
@@ -424,6 +494,12 @@ export default function App() {
       setSelectedProduct(product);
       setActiveTab("product_detail");
       window.scrollTo({ top: 0, behavior: "smooth" });
+
+      // Update browsing records automatically
+      setViewHistory(prev => {
+        const filtered = prev.filter(p => p.id !== product.id);
+        return [product, ...filtered].slice(0, 12); // Keep last 12 items for memory safety
+      });
     } else {
       setSelectedProduct(null);
       setActiveTab(previousTab);
@@ -864,6 +940,7 @@ Would you like to compare brands like Woom, Specialized, or Decathlon, or should
             userEmail={userEmail}
             lang={lang}
             currencyData={currencyData}
+            viewHistory={viewHistory}
           />
         )}
 
@@ -916,6 +993,10 @@ Would you like to compare brands like Woom, Specialized, or Decathlon, or should
             productsData={productsData}
             lang={lang}
             currencyData={currencyData}
+            viewHistory={viewHistory}
+            compareList={compareList}
+            setCompareList={setCompareList}
+            onSelectProduct={handleSelectProduct}
           />
         )}
 

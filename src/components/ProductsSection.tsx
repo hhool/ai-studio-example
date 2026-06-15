@@ -33,6 +33,7 @@ interface ProductsSectionProps {
   userEmail: string;
   lang?: "zh" | "en";
   currencyData: CurrencyData;
+  viewHistory?: Product[];
 }
 
 export default function ProductsSection({
@@ -45,7 +46,8 @@ export default function ProductsSection({
   childProfile,
   userEmail,
   lang = "zh",
-  currencyData
+  currencyData,
+  viewHistory
 }: ProductsSectionProps) {
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState<string>("");
@@ -399,6 +401,47 @@ export default function ProductsSection({
         </div>
       )}
 
+      {viewHistory && viewHistory.length > 0 && (
+        <section className="mt-20 border-t border-slate-100 pt-16 space-y-8">
+          <div className="flex gap-3 items-center">
+            <div className="w-10 h-10 bg-slate-50 border border-slate-100 rounded-2xl flex items-center justify-center text-slate-500 shadow-sm">
+              <span className="font-sans text-lg">🕒</span>
+            </div>
+            <div>
+              <h3 className="text-2xl font-black text-slate-900 tracking-tight">
+                {lang === "zh" ? "最近浏览车款" : "Recently Viewed Strollers"}
+              </h3>
+              <p className="text-slate-400 text-xs font-semibold">
+                {lang === "zh" ? "您最近查看过的物理测试细节档案（保存在浏览器中）" : "Quickly retrieve strollers you investigated recently (Cached in your browser)"}
+              </p>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            {viewHistory.slice(0, 4).map(p => {
+              const dp = translateProduct(p, lang);
+              return (
+                <div 
+                  key={p.id}
+                  onClick={() => onSelectProduct(p)}
+                  className="bg-white border border-slate-100 hover:border-orange-200 rounded-[32px] p-5 flex items-center gap-4 cursor-pointer hover:shadow-xl transition duration-300 group"
+                >
+                  <div className="w-16 h-16 bg-slate-50 border border-slate-100/50 rounded-2xl flex items-center justify-center p-2 shrink-0 group-hover:bg-orange-50/50 transition">
+                    <img src={p.imageUrl} alt={p.name} className="w-full h-full object-contain" referrerPolicy="no-referrer" />
+                  </div>
+                  <div className="min-w-0">
+                    <h5 className="font-extrabold text-slate-900 group-hover:text-orange-500 transition truncate text-sm">
+                      {dp.name}
+                    </h5>
+                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wide">
+                      {dp.brand}
+                    </p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      )}
 
     </div>
   );

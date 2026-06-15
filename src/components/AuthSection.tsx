@@ -39,6 +39,10 @@ interface AuthSectionProps {
   productsData: Product[];
   lang?: "zh" | "en";
   currencyData: CurrencyData;
+  viewHistory?: Product[];
+  compareList?: Product[];
+  setCompareList?: (list: Product[]) => void;
+  onSelectProduct?: (p: Product) => void;
 }
 
 export default function AuthSection({
@@ -49,7 +53,11 @@ export default function AuthSection({
   onClearSaved,
   productsData,
   lang = "zh",
-  currencyData
+  currencyData,
+  viewHistory,
+  compareList,
+  setCompareList,
+  onSelectProduct
 }: AuthSectionProps) {
   const isEn = lang === "en";
 
@@ -520,7 +528,8 @@ export default function AuthSection({
         </div>
       ) : (
         // Non-Logined Registration Board
-        <div className="max-w-md mx-auto bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl space-y-6 relative overflow-hidden text-left">
+        <div className="space-y-8">
+          <div className="max-w-md mx-auto bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl space-y-6 relative overflow-hidden text-left">
           
           <div className="absolute right-0 top-0 bg-amber-500/10 text-amber-500 text-[9px] px-3 py-1 font-bold rounded-bl uppercase tracking-widest font-mono">
             Secure GDPR Port
@@ -750,6 +759,95 @@ export default function AuthSection({
           </div>
 
         </div>
+
+        {/* Guest Local sandboxed Workspace for browsing & comparison history */}
+        {((viewHistory && viewHistory.length > 0) || (compareList && compareList.length > 0)) && (
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-inner space-y-6 text-left">
+            <div className="border-b border-slate-800 pb-4">
+              <h3 className="text-lg font-black text-white flex items-center gap-2">
+                 <span className="text-amber-500">⚡</span>
+                 <span>{isEn ? "Browsing Sandbox Workspace" : "浏览器本地草稿箱 (游客免登工作台)"}</span>
+              </h3>
+              <p className="text-xs text-slate-400">
+                {isEn 
+                  ? "Your recently viewed items and comparison slots are stored locally in the browser cache (localStorage)." 
+                  : "以下数据暂存于您的浏览器缓存（localStorage）中。即便您目前没有登录，重新加载页面也会自动恢复。"}
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              {/* 1. Comparison briefcase */}
+              {compareList && compareList.length > 0 && (
+                <div className="space-y-4">
+                  <h4 className="text-xs font-black text-amber-500 uppercase tracking-wider flex items-center justify-between">
+                     <span>{isEn ? "📊 My Local Compare Briefcase" : "📊 待对比车款"}</span>
+                     <span className="text-[10px] bg-slate-850 text-slate-400 px-2.5 py-0.5 rounded-full font-mono">{compareList.length}/3</span>
+                  </h4>
+                  <div className="space-y-2">
+                     {compareList.map(p => {
+                       const disp = translateProduct(p, lang);
+                       return (
+                         <div key={p.id} className="bg-slate-950 p-4 rounded-xl border border-slate-800 flex items-center justify-between gap-3">
+                           <div className="flex items-center gap-3 min-w-0 cursor-pointer" onClick={() => onSelectProduct && onSelectProduct(p)}>
+                             <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center p-1 shrink-0">
+                               <img src={p.imageUrl} alt={p.name} className="w-full h-full object-contain" referrerPolicy="no-referrer" />
+                             </div>
+                             <div className="min-w-0">
+                               <h5 className="text-xs font-extrabold text-white truncate">{disp.name}</h5>
+                               <p className="text-[9px] text-slate-500 uppercase font-black tracking-wider">{disp.brand}</p>
+                             </div>
+                           </div>
+                           <button
+                             type="button"
+                             onClick={() => setCompareList && setCompareList(compareList.filter(item => item.id !== p.id))}
+                             className="text-xs text-slate-500 hover:text-red-400 p-1 rounded hover:bg-slate-900 cursor-pointer transition-colors"
+                           >
+                             <X className="w-4 h-4" />
+                           </button>
+                         </div>
+                       );
+                     })}
+                  </div>
+                </div>
+              )}
+
+              {/* 2. Recently viewed history */}
+              {viewHistory && viewHistory.length > 0 && (
+                <div className="space-y-4">
+                  <h4 className="text-xs font-black text-amber-500 uppercase tracking-wider flex items-center justify-between">
+                     <span>{isEn ? "🕒 Recently Viewed" : "🕒 最近浏览车辆"}</span>
+                     <span className="text-[10px] bg-slate-850 text-slate-400 px-2.5 py-0.5 rounded-full font-mono">{viewHistory.length}</span>
+                  </h4>
+                  <div className="space-y-2 max-h-[300px] overflow-y-auto custom-scrollbar">
+                     {viewHistory.map(p => {
+                       const disp = translateProduct(p, lang);
+                       return (
+                         <div 
+                           key={p.id} 
+                           onClick={() => onSelectProduct && onSelectProduct(p)}
+                           className="bg-slate-950 p-4 rounded-xl border border-slate-800 flex items-center gap-3 hover:border-slate-700 hover:bg-slate-900/40 transition cursor-pointer"
+                         >
+                           <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center p-1 shrink-0">
+                             <img src={p.imageUrl} alt={p.name} className="w-full h-full object-contain" referrerPolicy="no-referrer" />
+                           </div>
+                           <div className="min-w-0">
+                             <h5 className="text-xs font-extrabold text-white truncate">{disp.name}</h5>
+                             <p className="text-[9px] text-slate-500 uppercase font-black tracking-wider">{disp.brand}</p>
+                           </div>
+                           <div className="ml-auto text-xs font-mono font-bold text-amber-400">
+                             {currencyData.symbol}{disp.price}
+                           </div>
+                         </div>
+                       );
+                     })}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+      </div>
       )}
 
     </div>
