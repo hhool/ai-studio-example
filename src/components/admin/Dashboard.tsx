@@ -8,8 +8,8 @@ import {
   ShieldCheck,
   Database
 } from "lucide-react";
-import { getCMSProducts, getCMSEvaluations, getCMSGuides, getCMSNews, saveCMSProduct } from "../../lib/cmsService";
-import { productsData } from "../../data/modelsData";
+import { getCMSProducts, getCMSEvaluations, getCMSGuides, getCMSNews, saveCMSProduct, seedProductsToFirestore } from "../../lib/cmsService";
+import { productsData as defaultProductsData } from "../../data/modelsData";
 import { translateProduct } from "../../lib/translate";
 import { CMSProduct } from "../../types";
 
@@ -49,7 +49,7 @@ export default function Dashboard({ lang }: { lang: "zh" | "en" }) {
     const confirm = window.confirm("Are you sure you want to push modelsData into Firestore? Existing records with the same ID will be overwritten.");
     if (!confirm) return;
     setMigrating(true);
-    for (const p of productsData) {
+    for (const p of defaultProductsData) {
       const pZh = translateProduct(p, "zh");
       const pEn = translateProduct(p, "en");
 
@@ -81,6 +81,26 @@ export default function Dashboard({ lang }: { lang: "zh" | "en" }) {
     setMigrating(false);
     fetchStats();
     alert("Migration complete!");
+  };
+
+  const handleForceSync = async () => {
+    const confirm = window.confirm(lang === "zh" ? "您确定要强制同步数据到 Firestore 吗？这将会使用默认车型数据重新初始化并清空不兼容格式的数据。" : "Are you sure you want to force sync products to Firestore? This will serialize correct default stroller structures directly into your Firestore project.");
+    if (!confirm) return;
+    setMigrating(true);
+    try {
+      const success = await seedProductsToFirestore(defaultProductsData, translateProduct);
+      if (success) {
+        alert(lang === "zh" ? "数据强制同步成功！" : "Database force-sync completed successfully!");
+      } else {
+        alert(lang === "zh" ? "同步失败，请检查控制台。" : "Sync failed, please consult console logs.");
+      }
+    } catch (e: any) {
+      console.error("Force sync failed:", e);
+      alert((lang === "zh" ? "同步出错: " : "Sync Error: ") + (e.message || e));
+    } finally {
+      setMigrating(false);
+      fetchStats();
+    }
   };
 
   const cards = [
@@ -119,16 +139,24 @@ export default function Dashboard({ lang }: { lang: "zh" | "en" }) {
               <ShieldCheck className="w-6 h-6 text-emerald-500" />
               {lang === "zh" ? "自动化质量控 (QA)" : "Automated Quality Control"}
             </h3>
-            <div className="flex gap-2">
+            <div className="flex gap-2 items-center flex-wrap">
+              <button
+                onClick={handleForceSync}
+                disabled={migrating}
+                className="text-[10px] bg-amber-500 hover:bg-amber-600 text-slate-950 px-3 py-1.5 rounded-full font-black uppercase hover:shadow-md disabled:opacity-50 flex items-center gap-1 cursor-pointer transition"
+              >
+                <Database className="w-3 h-3" />
+                {migrating ? (lang === "zh" ? "同步中..." : "Syncing...") : (lang === "zh" ? "强制同步数据" : "Force Sync Data")}
+              </button>
               <button
                 onClick={handleMigrate}
                 disabled={migrating}
-                className="text-[10px] bg-slate-900 text-white px-3 py-1 rounded-full font-black uppercase hover:bg-slate-800 disabled:opacity-50 flex items-center gap-1"
+                className="text-[10px] bg-slate-900 hover:bg-slate-800 text-white px-3 py-1.5 rounded-full font-black uppercase hover:shadow-md disabled:opacity-50 flex items-center gap-1 cursor-pointer transition"
               >
                 <Database className="w-3 h-3" />
                 {migrating ? "Migrating..." : "Seed modelsData"}
               </button>
-              <span className="text-[10px] bg-emerald-100 text-emerald-600 px-3 py-1 rounded-full font-black uppercase">Active</span>
+              <span className="text-[10px] bg-emerald-100 text-emerald-600 px-3 py-1.5 rounded-full font-black uppercase">Active</span>
             </div>
           </div>
           

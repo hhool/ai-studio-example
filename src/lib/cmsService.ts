@@ -13,6 +13,7 @@ import {
 } from "firebase/firestore";
 import { db, auth } from "./firebase";
 import { CMSProduct, Evaluation, Guide, News, CMSSettings } from "../types";
+import { handleFirestoreError, OperationType } from "./firestoreHelper";
 
 import { User } from "firebase/auth";
 
@@ -53,14 +54,20 @@ export async function checkIsAdmin(uid: string, user?: User | null): Promise<boo
 
 // Product Management
 export async function getCMSProducts(onlyPublished = false): Promise<CMSProduct[]> {
-  let q;
-  if (onlyPublished) {
-    q = query(collection(db, "products"), where("status", "==", "published"));
-  } else {
-    q = query(collection(db, "products"), orderBy("updatedAt", "desc"));
+  const path = "products";
+  try {
+    let q;
+    if (onlyPublished) {
+      q = query(collection(db, "products"), where("status", "==", "published"));
+    } else {
+      q = query(collection(db, "products"), orderBy("updatedAt", "desc"));
+    }
+    const snap = await getDocs(q);
+    return snap.docs.map(d => d.data() as CMSProduct);
+  } catch (error) {
+    handleFirestoreError(error, OperationType.LIST, path);
+    return [];
   }
-  const snap = await getDocs(q);
-  return snap.docs.map(d => d.data() as CMSProduct);
 }
 
 function cleanUndefinedValues(obj: any): any {
@@ -90,15 +97,21 @@ function cleanUndefinedValues(obj: any): any {
 }
 
 export async function saveCMSProduct(product: CMSProduct) {
-  const pDoc = doc(db, "products", product.id);
-  const purified = cleanUndefinedValues({
-    ...product,
-    updatedAt: serverTimestamp()
-  });
-  await setDoc(pDoc, purified);
+  const path = `products/${product.id}`;
+  try {
+    const pDoc = doc(db, "products", product.id);
+    const purified = cleanUndefinedValues({
+      ...product,
+      updatedAt: serverTimestamp()
+    });
+    await setDoc(pDoc, purified);
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, path);
+  }
 }
 
 export async function seedProductsToFirestore(productsData: any[], translateProductFn: any) {
+  const path = "products";
   try {
     for (const p of productsData) {
       const pZh = translateProductFn(p, "zh");
@@ -134,82 +147,127 @@ export async function seedProductsToFirestore(productsData: any[], translateProd
     return true;
   } catch (error) {
     console.error("Auto seeding products failed:", error);
+    handleFirestoreError(error, OperationType.WRITE, path);
     return false;
   }
 }
 
 // Evaluation Management
 export async function getCMSEvaluations(onlyPublished = false): Promise<Evaluation[]> {
-  let q;
-  if (onlyPublished) {
-    q = query(collection(db, "evaluations"), where("status", "==", "published"));
-  } else {
-    q = query(collection(db, "evaluations"), orderBy("updatedAt", "desc"));
+  const path = "evaluations";
+  try {
+    let q;
+    if (onlyPublished) {
+      q = query(collection(db, "evaluations"), where("status", "==", "published"));
+    } else {
+      q = query(collection(db, "evaluations"), orderBy("updatedAt", "desc"));
+    }
+    const snap = await getDocs(q);
+    return snap.docs.map(d => d.data() as Evaluation);
+  } catch (error) {
+    handleFirestoreError(error, OperationType.LIST, path);
+    return [];
   }
-  const snap = await getDocs(q);
-  return snap.docs.map(d => d.data() as Evaluation);
 }
 
 export async function saveCMSEvaluation(ev: Evaluation) {
-  const eDoc = doc(db, "evaluations", ev.id);
-  const purified = cleanUndefinedValues({
-    ...ev,
-    updatedAt: serverTimestamp()
-  });
-  await setDoc(eDoc, purified);
+  const path = `evaluations/${ev.id}`;
+  try {
+    const eDoc = doc(db, "evaluations", ev.id);
+    const purified = cleanUndefinedValues({
+      ...ev,
+      updatedAt: serverTimestamp()
+    });
+    await setDoc(eDoc, purified);
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, path);
+  }
 }
 
 // Guide Management
 export async function getCMSGuides(onlyPublished = false): Promise<Guide[]> {
-  let q;
-  if (onlyPublished) {
-    q = query(collection(db, "guides"), where("status", "==", "published"));
-  } else {
-    q = query(collection(db, "guides"), orderBy("updatedAt", "desc"));
+  const path = "guides";
+  try {
+    let q;
+    if (onlyPublished) {
+      q = query(collection(db, "guides"), where("status", "==", "published"));
+    } else {
+      q = query(collection(db, "guides"), orderBy("updatedAt", "desc"));
+    }
+    const snap = await getDocs(q);
+    return snap.docs.map(d => d.data() as Guide);
+  } catch (error) {
+    handleFirestoreError(error, OperationType.LIST, path);
+    return [];
   }
-  const snap = await getDocs(q);
-  return snap.docs.map(d => d.data() as Guide);
 }
 
 export async function saveCMSGuide(guide: Guide) {
-  const gDoc = doc(db, "guides", guide.id);
-  const purified = cleanUndefinedValues({
-    ...guide,
-    updatedAt: serverTimestamp()
-  });
-  await setDoc(gDoc, purified);
+  const path = `guides/${guide.id}`;
+  try {
+    const gDoc = doc(db, "guides", guide.id);
+    const purified = cleanUndefinedValues({
+      ...guide,
+      updatedAt: serverTimestamp()
+    });
+    await setDoc(gDoc, purified);
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, path);
+  }
 }
 
 // News Management
 export async function getCMSNews(onlyPublished = false): Promise<News[]> {
-  let q;
-  if (onlyPublished) {
-    q = query(collection(db, "news"), where("status", "==", "published"));
-  } else {
-    q = query(collection(db, "news"), orderBy("updatedAt", "desc"));
+  const path = "news";
+  try {
+    let q;
+    if (onlyPublished) {
+      q = query(collection(db, "news"), where("status", "==", "published"));
+    } else {
+      q = query(collection(db, "news"), orderBy("updatedAt", "desc"));
+    }
+    const snap = await getDocs(q);
+    return snap.docs.map(d => d.data() as News);
+  } catch (error) {
+    handleFirestoreError(error, OperationType.LIST, path);
+    return [];
   }
-  const snap = await getDocs(q);
-  return snap.docs.map(d => d.data() as News);
 }
 
 export async function saveCMSNews(news: News) {
-  const nDoc = doc(db, "news", news.id);
-  const purified = cleanUndefinedValues({
-    ...news,
-    updatedAt: serverTimestamp()
-  });
-  await setDoc(nDoc, purified);
+  const path = `news/${news.id}`;
+  try {
+    const nDoc = doc(db, "news", news.id);
+    const purified = cleanUndefinedValues({
+      ...news,
+      updatedAt: serverTimestamp()
+    });
+    await setDoc(nDoc, purified);
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, path);
+  }
 }
 
 // Global Settings
 export async function getCMSSettings(): Promise<CMSSettings | null> {
-  const sDoc = doc(db, "settings", "global");
-  const snap = await getDoc(sDoc);
-  return snap.exists() ? (snap.data() as CMSSettings) : null;
+  const path = "settings/global";
+  try {
+    const sDoc = doc(db, "settings", "global");
+    const snap = await getDoc(sDoc);
+    return snap.exists() ? (snap.data() as CMSSettings) : null;
+  } catch (error) {
+    handleFirestoreError(error, OperationType.GET, path);
+    return null;
+  }
 }
 
 export async function saveCMSSettings(settings: CMSSettings) {
-  const sDoc = doc(db, "settings", "global");
-  const purified = cleanUndefinedValues(settings);
-  await setDoc(sDoc, purified);
+  const path = "settings/global";
+  try {
+    const sDoc = doc(db, "settings", "global");
+    const purified = cleanUndefinedValues(settings);
+    await setDoc(sDoc, purified);
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, path);
+  }
 }
