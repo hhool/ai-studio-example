@@ -62,7 +62,7 @@ export async function getCMSProducts(onlyPublished = false): Promise<CMSProduct[
     } else {
       q = query(collection(db, "products"), orderBy("updatedAt", "desc"));
     }
-    const snap = await getDocs(q);
+    const snap = await withTimeout(getDocs(q), 5000);
     return snap.docs.map(d => d.data() as CMSProduct);
   } catch (error) {
     handleFirestoreError(error, OperationType.LIST, path);
@@ -141,7 +141,7 @@ export async function seedProductsToFirestore(productsData: any[], translateProd
         updatedAt: serverTimestamp()
       };
       const purified = cleanUndefinedValues(cmsProd);
-      await setDoc(doc(db, "products", cmsProd.id), purified);
+      await withTimeout(setDoc(doc(db, "products", cmsProd.id), purified), 5000);
     }
     console.log("Seeding of productsData to Firestore completed successfully.");
     return true;
@@ -162,7 +162,7 @@ export async function getCMSEvaluations(onlyPublished = false): Promise<Evaluati
     } else {
       q = query(collection(db, "evaluations"), orderBy("updatedAt", "desc"));
     }
-    const snap = await getDocs(q);
+    const snap = await withTimeout(getDocs(q), 5000);
     return snap.docs.map(d => d.data() as Evaluation);
   } catch (error) {
     handleFirestoreError(error, OperationType.LIST, path);
@@ -194,7 +194,7 @@ export async function getCMSGuides(onlyPublished = false): Promise<Guide[]> {
     } else {
       q = query(collection(db, "guides"), orderBy("updatedAt", "desc"));
     }
-    const snap = await getDocs(q);
+    const snap = await withTimeout(getDocs(q), 5000);
     return snap.docs.map(d => d.data() as Guide);
   } catch (error) {
     handleFirestoreError(error, OperationType.LIST, path);
@@ -226,7 +226,7 @@ export async function getCMSNews(onlyPublished = false): Promise<News[]> {
     } else {
       q = query(collection(db, "news"), orderBy("updatedAt", "desc"));
     }
-    const snap = await getDocs(q);
+    const snap = await withTimeout(getDocs(q), 5000);
     return snap.docs.map(d => d.data() as News);
   } catch (error) {
     handleFirestoreError(error, OperationType.LIST, path);

@@ -138,11 +138,15 @@ export default function AuthSection({
       }
     } catch (error: any) {
       console.error(error);
-      let msg = error.message;
+      let msg = error.message || String(error);
       if (error.code === "auth/unauthorized-domain") {
         msg = isEn 
           ? "Unauthorized Domain: Please add this URL to your Firebase Console > Authentication > Settings > Authorized domains list."
           : "域名未授权：请将当前网址添加到 Firebase 控制台的“Authentication (身份验证) > Settings (设置) > 已授权域名”列表中。";
+      } else if (msg.toLowerCase().includes("cross-origin") || msg.toLowerCase().includes("popup") || error.code === "auth/popup-closed-by-user") {
+        msg = isEn 
+          ? "Popup blocked or closed by iframe security. **Please click the top-right button to Open in New Tab** to sign in." 
+          : "嵌入安全策略拦截了弹窗，或弹窗被关闭。**强烈建议：请点击屏幕右上角「在新标签页中打开」按钮继续登录。**";
       }
       setErrorMessage(
         isEn 

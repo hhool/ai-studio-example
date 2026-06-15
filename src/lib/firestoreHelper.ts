@@ -47,7 +47,7 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
   throw new Error(JSON.stringify(errInfo));
 }
 
-export function withTimeout<T>(promise: Promise<T>, ms: number = 8000): Promise<T> {
+export function withTimeout<T>(promise: Promise<T>, ms: number = 4000): Promise<T> {
   return Promise.race([
     promise,
     new Promise<T>((_, reject) => 
