@@ -5,9 +5,13 @@ import {
   TrendingUp, 
   FileText, 
   Package, 
-  ShieldCheck 
+  ShieldCheck,
+  Database
 } from "lucide-react";
-import { getCMSProducts, getCMSEvaluations, getCMSGuides, getCMSNews } from "../../lib/cmsService";
+import { getCMSProducts, getCMSEvaluations, getCMSGuides, getCMSNews, saveCMSProduct } from "../../lib/cmsService";
+import { productsData } from "../../data/modelsData";
+import { translateProduct } from "../../lib/translate";
+import { CMSProduct } from "../../types";
 
 export default function Dashboard({ lang }: { lang: "zh" | "en" }) {
   const [stats, setStats] = useState({
@@ -18,25 +22,66 @@ export default function Dashboard({ lang }: { lang: "zh" | "en" }) {
     drafts: 0
   });
 
+  const [migrating, setMigrating] = useState(false);
+
+  const fetchStats = async () => {
+    const [p, e, g, n] = await Promise.all([
+      getCMSProducts(),
+      getCMSEvaluations(),
+      getCMSGuides(),
+      getCMSNews()
+    ]);
+    const all = [...p, ...e, ...g, ...n];
+    setStats({
+      products: p.length,
+      evaluations: e.length,
+      guides: g.length,
+      news: n.length,
+      drafts: all.filter(x => x.status === "draft").length
+    });
+  };
+
   useEffect(() => {
-    async function fetchStats() {
-      const [p, e, g, n] = await Promise.all([
-        getCMSProducts(),
-        getCMSEvaluations(),
-        getCMSGuides(),
-        getCMSNews()
-      ]);
-      const all = [...p, ...e, ...g, ...n];
-      setStats({
-        products: p.length,
-        evaluations: e.length,
-        guides: g.length,
-        news: n.length,
-        drafts: all.filter(x => x.status === "draft").length
-      });
-    }
     fetchStats();
   }, []);
+
+  const handleMigrate = async () => {
+    const confirm = window.confirm("Are you sure you want to push modelsData into Firestore? Existing records with the same ID will be overwritten.");
+    if (!confirm) return;
+    setMigrating(true);
+    for (const p of productsData) {
+      const pZh = translateProduct(p, "zh");
+      const pEn = translateProduct(p, "en");
+
+      const cmsProd: CMSProduct = {
+        ...p,
+        status: "published",
+        zh: {
+          name: pZh.name,
+          description: pZh.description,
+          brandText: pZh.brand,
+          specsText: "",
+          pros: pZh.pros,
+          cons: pZh.cons,
+          editorVerdict: pZh.editorVerdict,
+        },
+        en: {
+          name: pEn.name,
+          description: pEn.description,
+          brandText: pEn.brand,
+          specsText: "",
+          pros: pEn.pros,
+          cons: pEn.cons,
+          editorVerdict: pEn.editorVerdict,
+        },
+        updatedAt: new Date()
+      };
+      await saveCMSProduct(cmsProd);
+    }
+    setMigrating(false);
+    fetchStats();
+    alert("Migration complete!");
+  };
 
   const cards = [
     { label: lang === "zh" ? "产品库" : "Products", value: stats.products, icon: <Package className="w-5 h-5 text-blue-500" />, color: "blue" },
@@ -74,7 +119,17 @@ export default function Dashboard({ lang }: { lang: "zh" | "en" }) {
               <ShieldCheck className="w-6 h-6 text-emerald-500" />
               {lang === "zh" ? "自动化质量控 (QA)" : "Automated Quality Control"}
             </h3>
-            <span className="text-[10px] bg-emerald-100 text-emerald-600 px-3 py-1 rounded-full font-black uppercase">Active</span>
+            <div className="flex gap-2">
+              <button
+                onClick={handleMigrate}
+                disabled={migrating}
+                className="text-[10px] bg-slate-900 text-white px-3 py-1 rounded-full font-black uppercase hover:bg-slate-800 disabled:opacity-50 flex items-center gap-1"
+              >
+                <Database className="w-3 h-3" />
+                {migrating ? "Migrating..." : "Seed modelsData"}
+              </button>
+              <span className="text-[10px] bg-emerald-100 text-emerald-600 px-3 py-1 rounded-full font-black uppercase">Active</span>
+            </div>
           </div>
           
           <div className="space-y-6">
