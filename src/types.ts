@@ -81,7 +81,7 @@ export interface CMSProduct extends Product {
 
 export interface Evaluation {
   id: string;
-  type?: "single" | "compare" | "value" | "ranking";
+  type?: "single" | "compare" | "value" | "ranking" | "safety" | "durability" | "ergonomics";
   productIds?: string[];
   productId: string; // Maintain for backward compatibility
   status: "draft" | "published" | "archived";

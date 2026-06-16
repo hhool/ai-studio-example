@@ -154,22 +154,31 @@ export default function EvaluationsSection({
     { id: "single", label: "🔬 SINGLE TEST" },
     { id: "compare", label: "⚖️ CROSS COMPARE" },
     { id: "value", label: "💰 VALUE RANK" },
-    { id: "ranking", label: "🏆 ANNUAL TOP" }
+    { id: "ranking", label: "🏆 ANNUAL TOP" },
+    { id: "safety", label: "🛡️ SAFETY SPECIAL" },
+    { id: "durability", label: "🔧 DURABILITY" },
+    { id: "ergonomics", label: "📐 ERGONOMICS" }
   ] : [
     { id: "all", label: "📁 全部评估" },
     { id: "single", label: "🔬 单品实测" },
     { id: "compare", label: "⚖️ 多品横评" },
     { id: "value", label: "💰 性价比测评" },
-    { id: "ranking", label: "🏆 年度榜单" }
+    { id: "ranking", label: "🏆 年度榜单" },
+    { id: "safety", label: "🛡️ 安全专项" },
+    { id: "durability", label: "🔧 耐用测试" },
+    { id: "ergonomics", label: "📐 人体工学" }
   ];
 
   // Map real evaluations instead of products
   const reviewsList = useMemo(() => {
     return evaluationsData.filter(ev => ev.status === "published").map((ev) => {
       let badge = "REPORT";
-      if (ev.type === "compare") badge = lang === "en" ? "COMPARISON" : "横品对比";
+      if (ev.type === "compare") badge = lang === "en" ? "COMPARISON" : "多品横评";
       if (ev.type === "value") badge = lang === "en" ? "VALUE PICK" : "性价比之选";
       if (ev.type === "ranking") badge = lang === "en" ? "TOP RANKING" : "年度排行";
+      if (ev.type === "safety") badge = lang === "en" ? "SAFETY SPECS" : "安全专项测试";
+      if (ev.type === "durability") badge = lang === "en" ? "DURABILITY SCORE" : "耐用极限测试";
+      if (ev.type === "ergonomics") badge = lang === "en" ? "ERGONOMICS INDEX" : "工效及坐姿评测";
       if (ev.type === "single" || !ev.type) badge = lang === "en" ? "EXPERT REPORT" : "深度专家报告";
       
       return {
@@ -193,7 +202,8 @@ export default function EvaluationsSection({
 
   const renderList = useMemo(() => {
     return filteredReviews.map(r => {
-      if (r.reviewType === "single") {
+      const isSingle = r.reviewType === "single" || r.reviewType === "safety" || r.reviewType === "durability" || r.reviewType === "ergonomics";
+      if (isSingle) {
         const product = productsData.find(p => p.id === r.evaluation.productId);
         return {
           type: "single",
@@ -215,7 +225,14 @@ export default function EvaluationsSection({
     });
   }, [filteredReviews, productsData]);
 
-  if (selectedEvaluation && selectedEvaluation.type && selectedEvaluation.type !== "single") {
+  const isSelectedSingle = selectedEvaluation && 
+    (selectedEvaluation.type === "single" || 
+     selectedEvaluation.type === "safety" || 
+     selectedEvaluation.type === "durability" || 
+     selectedEvaluation.type === "ergonomics" ||
+     !selectedEvaluation.type);
+
+  if (selectedEvaluation && !isSelectedSingle) {
     return (
       <MultiCompareView 
         evaluation={selectedEvaluation}
