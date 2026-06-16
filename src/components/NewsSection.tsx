@@ -1,7 +1,20 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { Search, Calendar, User, Eye, BookOpen, Clock, ArrowLeft, Heart, Share2 } from "lucide-react";
-import { NewsArticle, newsArticles } from "../data/newsData";
+import { NewsArticle, newsArticles as fallbackNewsArticles } from "../data/newsData";
 import { translateNewsArticle } from "../lib/translate";
+import { getCMSNews } from "../lib/cmsService";
+
+function translateCategoryLabel(cat: string): string {
+  const labels: Record<string, string> = {
+    industry: "行业资讯",
+    new_product: "新品发布",
+    regulation: "合规政策",
+    recall: "安全预警",
+    brand_trend: "品牌动态",
+    science: "科普干货"
+  };
+  return labels[cat] || "最新动态";
+}
 import Breadcrumbs from "./Breadcrumbs";
 
 interface NewsSectionProps {
@@ -9,10 +22,60 @@ interface NewsSectionProps {
 }
 
 export default function NewsSection({ lang = "zh" }: NewsSectionProps) {
+  const [newsArticlesState, setNewsArticlesState] = useState<NewsArticle[]>(fallbackNewsArticles);
+  const [loadingNews, setLoadingNews] = useState<boolean>(false);
   const [selectedArticleState, setSelectedArticleState] = useState<any | null>(null);
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [sortBy, setSortBy] = useState<string>("date"); // 'date' | 'views'
+
+  useEffect(() => {
+    setLoadingNews(true);
+    // 1. Frist try fetching editable CMS news from the Firestore database
+    getCMSNews(true)
+      .then((dbNews) => {
+        if (dbNews && dbNews.length > 0) {
+          const mapped: NewsArticle[] = dbNews.map((n) => ({
+            id: n.id,
+            title: n.zh?.title || n.en?.title || "",
+            category: n.category as any,
+            categoryLabel: translateCategoryLabel(n.category),
+            summary: n.seo?.zh?.description || n.seo?.en?.description || "Kidsmobi 行业动态与科普报告。",
+            content: n.zh?.content || n.en?.content || "",
+            author: "Kidsmobi 全球安全实验室",
+            readTime: "5 分钟",
+            publishDate: n.updatedAt && n.updatedAt.seconds
+              ? new Date(n.updatedAt.seconds * 1000).toISOString().split("T")[0]
+              : "2026-06-15",
+            views: 4200
+          }));
+          setNewsArticlesState(mapped);
+          setLoadingNews(false);
+        } else {
+          throw new Error("No CMS news found in Firestore, falling back to local server endpoint");
+        }
+      })
+      .catch((err) => {
+        console.log("Firestore news retrieval failed, fallback to Express API server:", err);
+        // 2. Offline fallback to Express local Server API
+        fetch("/api/news")
+          .then((res) => {
+            if (!res.ok) throw new Error("Failed to load news from server");
+            return res.json();
+          })
+          .then((data) => {
+            if (Array.isArray(data) && data.length > 0) {
+              setNewsArticlesState(data);
+            }
+          })
+          .catch((fetchErr) => {
+            console.error("Local API server news fetch backup failed:", fetchErr);
+          })
+          .finally(() => {
+            setLoadingNews(false);
+          });
+      });
+  }, []);
 
   // Like counters holder
   const [likedList, setLikedList] = useState<string[]>([]);
@@ -37,7 +100,7 @@ export default function NewsSection({ lang = "zh" }: NewsSectionProps) {
   };
 
   const filteredNews = useMemo(() => {
-    return newsArticles
+    return newsArticlesState
       .map(art => translateNewsArticle(art, lang))
       .filter((art) => {
         const matchesCategory = selectedCategory === "all" || art.category === selectedCategory;
@@ -51,7 +114,7 @@ export default function NewsSection({ lang = "zh" }: NewsSectionProps) {
         if (sortBy === "views") return b.views - a.views;
         return new Date(b.publishDate).getTime() - new Date(a.publishDate).getTime();
       });
-  }, [searchQuery, selectedCategory, sortBy, lang]);
+  }, [newsArticlesState, searchQuery, selectedCategory, sortBy, lang]);
 
   return (
     <div id="news_hub" className="space-y-8 animate-fade-in text-left">

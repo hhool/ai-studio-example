@@ -8,9 +8,10 @@ import {
   ShieldCheck,
   Database
 } from "lucide-react";
-import { getCMSProducts, getCMSEvaluations, getCMSGuides, getCMSNews, saveCMSProduct, seedProductsToFirestore, seedGuidesToFirestore } from "../../lib/cmsService";
+import { getCMSProducts, getCMSEvaluations, getCMSGuides, getCMSNews, saveCMSProduct, seedProductsToFirestore, seedGuidesToFirestore, seedNewsToFirestore } from "../../lib/cmsService";
 import { productsData as defaultProductsData } from "../../data/modelsData";
 import { guideArticles } from "../../data/guidesData";
+import { newsArticles } from "../../data/newsData";
 import { translateProduct } from "../../lib/translate";
 import { CMSProduct } from "../../types";
 
@@ -124,6 +125,26 @@ export default function Dashboard({ lang }: { lang: "zh" | "en" }) {
     }
   };
 
+  const handleSyncNews = async () => {
+    const confirm = window.confirm(lang === "zh" ? "您确定要将 newsData 静态行业资讯数据同步至云端 Firestore 数据库中吗？这会覆盖或初始化云端资讯资源。" : "Are you sure you want to sync static news articles directly to your Firestore project? Existing news with the same IDs will be updated.");
+    if (!confirm) return;
+    setMigrating(true);
+    try {
+      const success = await seedNewsToFirestore(newsArticles);
+      if (success) {
+        alert(lang === "zh" ? "全球资讯同步成功！" : "Global News sync completed successfully!");
+      } else {
+        alert(lang === "zh" ? "资讯同步发生网络错误，请登录授权后重试。" : "News sync failed. Please make sure you are authenticated and try again.");
+      }
+    } catch (e: any) {
+      console.error("News sync failed:", e);
+      alert((lang === "zh" ? "同步资讯出错: " : "News Sync Error: ") + (e.message || e));
+    } finally {
+      setMigrating(false);
+      fetchStats();
+    }
+  };
+
   const cards = [
     { label: lang === "zh" ? "产品库" : "Products", value: stats.products, icon: <Package className="w-5 h-5 text-blue-500" />, color: "blue" },
     { label: lang === "zh" ? "实测报告" : "Reviews", value: stats.evaluations, icon: <FileText className="w-5 h-5 text-emerald-500" />, color: "emerald" },
@@ -168,6 +189,14 @@ export default function Dashboard({ lang }: { lang: "zh" | "en" }) {
               >
                 <Database className="w-3 h-3" />
                 {migrating ? (lang === "zh" ? "指南同步中..." : "Syncing...") : (lang === "zh" ? "同步指南数据" : "Sync Guides Data")}
+              </button>
+              <button
+                onClick={handleSyncNews}
+                disabled={migrating}
+                className="text-[10px] bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-full font-black uppercase hover:shadow-md disabled:opacity-50 flex items-center gap-1 cursor-pointer transition"
+              >
+                <Database className="w-3 h-3" />
+                {migrating ? (lang === "zh" ? "资讯同步中..." : "Syncing...") : (lang === "zh" ? "同步资讯数据" : "Sync News Data")}
               </button>
               <button
                 onClick={handleForceSync}

@@ -1,6 +1,7 @@
 import express from "express";
 import { GoogleGenAI } from "@google/genai";
 import { guideArticles } from "./data/guidesData";
+import { newsArticles } from "./data/newsData";
 import dotenv from "dotenv";
 
 // Load environment variables
@@ -14,6 +15,11 @@ app.use(express.json());
 // GET endpoint to retrieve guides data from the server
 app.get("/api/guides", (req, res) => {
   res.json(guideArticles);
+});
+
+// GET endpoint to retrieve news data from the server
+app.get("/api/news", (req, res) => {
+  res.json(newsArticles);
 });
 
 // Lazy initialize Gemini clients

@@ -260,6 +260,49 @@ export async function seedGuidesToFirestore(guidesData: any[]): Promise<boolean>
   }
 }
 
+export async function seedNewsToFirestore(newsData: any[]): Promise<boolean> {
+  const path = "news";
+  try {
+    for (const n of newsData) {
+      const cmsNews: News = {
+        id: n.id,
+        category: n.category,
+        status: "published",
+        imageUrl: "",
+        seo: {
+          zh: {
+            title: n.title,
+            description: n.summary,
+            keywords: [n.categoryLabel || "资讯"]
+          },
+          en: {
+            title: n.title,
+            description: n.summary,
+            keywords: [n.categoryLabel || "News"]
+          }
+        },
+        zh: {
+          title: n.title,
+          content: n.content,
+        },
+        en: {
+          title: n.title,
+          content: n.content,
+        },
+        updatedAt: serverTimestamp()
+      };
+      const purified = cleanUndefinedValues(cmsNews);
+      await withTimeout(setDoc(doc(db, "news", cmsNews.id), purified), 5000);
+    }
+    console.log("Seeding of news to Firestore completed successfully.");
+    return true;
+  } catch (error) {
+    console.error("Auto seeding news failed:", error);
+    handleFirestoreError(error, OperationType.WRITE, path);
+    return false;
+  }
+}
+
 // News Management
 export async function getCMSNews(onlyPublished = false): Promise<News[]> {
   const path = "news";
