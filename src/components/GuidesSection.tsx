@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { 
   BookOpen, 
   Search, 
@@ -19,9 +19,21 @@ import {
   MessageSquare,
   ChevronRight
 } from "lucide-react";
-import { GuideArticle, guideArticles } from "../data/guidesData";
+import { GuideArticle, guideArticles as fallbackGuideArticles } from "../data/guidesData";
 import { Product, CurrencyData } from "../types";
 import { translateProduct, translateGuideArticle } from "../lib/translate";
+import { getCMSGuides } from "../lib/cmsService";
+
+function translateCategoryLabel(cat: string): string {
+  const labels: Record<string, string> = {
+    beginner: "新手入门指南",
+    risk: "风险甄别指南",
+    export: "跨境选购指南",
+    maintenance: "养护使用指南",
+    scenario: "场景化选购指南"
+  };
+  return labels[cat] || "专业选购指南";
+}
 import { formatWeight, formatHeight } from "../lib/units";
 import Breadcrumbs from "./Breadcrumbs";
 
@@ -143,9 +155,58 @@ export default function GuidesSection({
   lang = "zh",
   currencyData
 }: GuidesSectionProps) {
+  const [guideArticles, setGuideArticles] = useState<GuideArticle[]>(fallbackGuideArticles);
+  const [loadingGuides, setLoadingGuides] = useState<boolean>(false);
   const [selectedGuideState, setSelectedGuideState] = useState<any | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState<string>("");
+
+  useEffect(() => {
+    setLoadingGuides(true);
+    // 1. Try fetching editable CMS guides from the Firestore Database
+    getCMSGuides(true)
+      .then((dbGuides) => {
+        if (dbGuides && dbGuides.length > 0) {
+          const mapped: GuideArticle[] = dbGuides.map((g) => ({
+            id: g.id,
+            title: g.zh?.title || g.en?.title || "",
+            category: g.category as any,
+            categoryLabel: translateCategoryLabel(g.category),
+            summary: g.seo?.zh?.description || g.seo?.en?.description || "专业选购指南与安全研究报告。",
+            content: g.zh?.content || g.en?.content || "",
+            author: "Kidsmobi 专家组",
+            readTime: "8 分钟",
+            publishDate: g.updatedAt && g.updatedAt.seconds
+              ? new Date(g.updatedAt.seconds * 1000).toISOString().split("T")[0]
+              : "2026-06-15"
+          }));
+          setGuideArticles(mapped);
+          setLoadingGuides(false);
+        } else {
+          throw new Error("No CMS guides in Firestore, using server API fallback");
+        }
+      })
+      .catch((err) => {
+        console.log("Firestore guides retrieve failed, falling back to express API server:", err);
+        // 2. Offline fallback to Express local Server API
+        fetch("/api/guides")
+          .then((res) => {
+            if (!res.ok) throw new Error("Failed to load guides from server");
+            return res.json();
+          })
+          .then((data) => {
+            if (Array.isArray(data) && data.length > 0) {
+              setGuideArticles(data);
+            }
+          })
+          .catch((fetchErr) => {
+            console.error("Local API server fetch backup failed:", fetchErr);
+          })
+          .finally(() => {
+            setLoadingGuides(false);
+          });
+      });
+  }, []);
   
   // Accordion state
   const [openFaqId, setOpenFaqId] = useState<string | null>("faq_1");
@@ -172,7 +233,7 @@ export default function GuidesSection({
           art.content.toLowerCase().includes(query);
         return matchesCat && matchesSearch;
       });
-  }, [selectedCategory, searchQuery, lang]);
+  }, [guideArticles, selectedCategory, searchQuery, lang]);
 
   // Match Wizard calculation formula
   const matchRecommendations = useMemo(() => {

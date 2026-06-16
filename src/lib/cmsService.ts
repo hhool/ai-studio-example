@@ -216,6 +216,50 @@ export async function saveCMSGuide(guide: Guide) {
   }
 }
 
+export async function seedGuidesToFirestore(guidesData: any[]): Promise<boolean> {
+  const path = "guides";
+  try {
+    for (const g of guidesData) {
+      const cmsGuide: Guide = {
+        id: g.id,
+        category: g.category,
+        status: "published",
+        imageUrl: "",
+        riskCards: [],
+        seo: {
+          zh: {
+            title: g.title,
+            description: g.summary,
+            keywords: [g.categoryLabel || "指南"]
+          },
+          en: {
+            title: g.title,
+            description: g.summary,
+            keywords: [g.categoryLabel || "Guide"]
+          }
+        },
+        zh: {
+          title: g.title,
+          content: g.content,
+        },
+        en: {
+          title: g.title,
+          content: g.content,
+        },
+        updatedAt: serverTimestamp()
+      };
+      const purified = cleanUndefinedValues(cmsGuide);
+      await withTimeout(setDoc(doc(db, "guides", cmsGuide.id), purified), 5000);
+    }
+    console.log("Seeding of guidesDoc to Firestore completed successfully.");
+    return true;
+  } catch (error) {
+    console.error("Auto seeding guides failed:", error);
+    handleFirestoreError(error, OperationType.WRITE, path);
+    return false;
+  }
+}
+
 // News Management
 export async function getCMSNews(onlyPublished = false): Promise<News[]> {
   const path = "news";

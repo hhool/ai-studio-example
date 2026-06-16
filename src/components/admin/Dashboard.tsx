@@ -8,8 +8,9 @@ import {
   ShieldCheck,
   Database
 } from "lucide-react";
-import { getCMSProducts, getCMSEvaluations, getCMSGuides, getCMSNews, saveCMSProduct, seedProductsToFirestore } from "../../lib/cmsService";
+import { getCMSProducts, getCMSEvaluations, getCMSGuides, getCMSNews, saveCMSProduct, seedProductsToFirestore, seedGuidesToFirestore } from "../../lib/cmsService";
 import { productsData as defaultProductsData } from "../../data/modelsData";
+import { guideArticles } from "../../data/guidesData";
 import { translateProduct } from "../../lib/translate";
 import { CMSProduct } from "../../types";
 
@@ -103,6 +104,26 @@ export default function Dashboard({ lang }: { lang: "zh" | "en" }) {
     }
   };
 
+  const handleSyncGuides = async () => {
+    const confirm = window.confirm(lang === "zh" ? "您确定要将 guidesData 静态选购指南数据同步至云端 Firestore 数据库中吗？这会覆盖或初始化云端指南资源。" : "Are you sure you want to sync static guide articles directly to your Firestore project? Existing guides with the same IDs will be updated.");
+    if (!confirm) return;
+    setMigrating(true);
+    try {
+      const success = await seedGuidesToFirestore(guideArticles);
+      if (success) {
+        alert(lang === "zh" ? "选购指南同步成功！" : "Guides sync completed successfully!");
+      } else {
+        alert(lang === "zh" ? "指南同步发生网络错误，请登录授权后重试。" : "Guides sync failed. Please make sure you are authenticated and try again.");
+      }
+    } catch (e: any) {
+      console.error("Guides sync failed:", e);
+      alert((lang === "zh" ? "同步指南出错: " : "Guides Sync Error: ") + (e.message || e));
+    } finally {
+      setMigrating(false);
+      fetchStats();
+    }
+  };
+
   const cards = [
     { label: lang === "zh" ? "产品库" : "Products", value: stats.products, icon: <Package className="w-5 h-5 text-blue-500" />, color: "blue" },
     { label: lang === "zh" ? "实测报告" : "Reviews", value: stats.evaluations, icon: <FileText className="w-5 h-5 text-emerald-500" />, color: "emerald" },
@@ -141,12 +162,20 @@ export default function Dashboard({ lang }: { lang: "zh" | "en" }) {
             </h3>
             <div className="flex gap-2 items-center flex-wrap">
               <button
+                onClick={handleSyncGuides}
+                disabled={migrating}
+                className="text-[10px] bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-full font-black uppercase hover:shadow-md disabled:opacity-50 flex items-center gap-1 cursor-pointer transition"
+              >
+                <Database className="w-3 h-3" />
+                {migrating ? (lang === "zh" ? "指南同步中..." : "Syncing...") : (lang === "zh" ? "同步指南数据" : "Sync Guides Data")}
+              </button>
+              <button
                 onClick={handleForceSync}
                 disabled={migrating}
                 className="text-[10px] bg-amber-500 hover:bg-amber-600 text-slate-950 px-3 py-1.5 rounded-full font-black uppercase hover:shadow-md disabled:opacity-50 flex items-center gap-1 cursor-pointer transition"
               >
                 <Database className="w-3 h-3" />
-                {migrating ? (lang === "zh" ? "同步中..." : "Syncing...") : (lang === "zh" ? "强制同步数据" : "Force Sync Data")}
+                {migrating ? (lang === "zh" ? "同步中..." : "Syncing...") : (lang === "zh" ? "修复同步数据" : "Force Sync Data")}
               </button>
               <button
                 onClick={handleMigrate}
