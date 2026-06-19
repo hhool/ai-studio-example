@@ -13,9 +13,15 @@ const getDirname = () => {
 };
 const UPLOADS_DIR = path.join(getDirname(), "../../../uploads");
 
-// Ensure root directory exists
-if (!fs.existsSync(UPLOADS_DIR)) {
-  fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+// Ensure root directory exists (Wrap in try-catch for Vercel Serverless read-only filesystem)
+if (!process.env.VERCEL) {
+try {
+  if (!fs.existsSync(UPLOADS_DIR)) {
+    fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+  }
+} catch (error) {
+  console.warn("Could not create local uploads directory (likely running on read-only serverless environment like Vercel). Local fallback will not work.");
+}
 }
 
 export const localAdapter = {

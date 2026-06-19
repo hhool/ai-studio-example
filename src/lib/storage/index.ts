@@ -1,5 +1,5 @@
-import { r2Adapter } from "./r2Adapter";
-import { localAdapter } from "./localAdapter";
+import { r2Adapter } from "./r2Adapter.js";
+import { localAdapter } from "./localAdapter.js";
 
 // Use 'r2' for production, 'local' for development fallback
 const STORAGE_MODE = process.env.STORAGE_MODE || "local";

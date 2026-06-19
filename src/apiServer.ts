@@ -1,7 +1,7 @@
 import express from "express";
 import { GoogleGenAI } from "@google/genai";
-import { guideArticles } from "./data/guidesData";
-import { newsArticles } from "./data/newsData";
+import { guideArticles } from "./data/guidesData.js";
+import { newsArticles } from "./data/newsData.js";
 import dotenv from "dotenv";
 
 // Load environment variables
@@ -187,7 +187,11 @@ const upload = multer({
       if (!key) return cb(new Error("Key is required"), UPLOADS_DIR);
       
       const dir = path.dirname(path.join(UPLOADS_DIR, key));
-      fs.mkdirSync(dir, { recursive: true });
+      try {
+        fs.mkdirSync(dir, { recursive: true });
+      } catch (e) {
+        console.warn("Could not create nested directory:", e);
+      }
       cb(null, dir);
     },
     filename: (req, file, cb) => {

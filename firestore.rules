@@ -66,6 +66,22 @@ service cloud.firestore {
       allow read: if true;
       allow write: if isAdmin();
     }
+   
+   // Categories & Taxonomies (分类与品类策略)
+    match /categories/{catId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+    match /taxonomies/{taxId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Assets (资源库元数据记录)
+    match /assets/{assetId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
 
     // Users & Bookmarks
     match /users/{userId} {

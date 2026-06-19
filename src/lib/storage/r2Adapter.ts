@@ -2,10 +2,11 @@ import { S3Client, DeleteObjectCommand, PutObjectCommand } from "@aws-sdk/client
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 const R2_ACCOUNT_ID = process.env.R2_ACCOUNT_ID || "";
-const R2_ACCESS_KEY = process.env.R2_ACCESS_KEY || "";
-const R2_SECRET_KEY = process.env.R2_SECRET_KEY || "";
-const R2_BUCKET_NAME = process.env.R2_BUCKET_NAME || "strollerlab-assets";
-const R2_PUBLIC_URL = process.env.R2_PUBLIC_URL || "http://localhost:3000/uploads";
+// 做了双重保险，无论你在 Vercel 填的是带 _ID 还是不带的，都能读到
+const R2_ACCESS_KEY = process.env.R2_ACCESS_KEY_ID || process.env.R2_ACCESS_KEY || "";
+const R2_SECRET_KEY = process.env.R2_SECRET_ACCESS_KEY || process.env.R2_SECRET_KEY || "";
+const R2_BUCKET_NAME = process.env.R2_BUCKET_NAME || "kidsmobi";
+const R2_PUBLIC_URL = process.env.R2_PUBLIC_URL || "https://downloader.poki2.online";
 
 const client = new S3Client({
   region: "auto",
@@ -14,10 +15,12 @@ const client = new S3Client({
     accessKeyId: R2_ACCESS_KEY,
     secretAccessKey: R2_SECRET_KEY,
   },
+  // 👇 就是这一行解决了 DNS 解析失败的畸形 URL 问题！
+  forcePathStyle: true, 
 });
 
 export const r2Adapter = {
-  getUploadUrl: async (key: string, contentType: string) => {
+  getUploadUrl: async (key, contentType) => {
     const command = new PutObjectCommand({
       Bucket: R2_BUCKET_NAME,
       Key: key,
@@ -29,7 +32,7 @@ export const r2Adapter = {
     return { uploadUrl, publicUrl };
   },
   
-  deleteAsset: async (key: string) => {
+  deleteAsset: async (key) => {
     const command = new DeleteObjectCommand({
       Bucket: R2_BUCKET_NAME,
       Key: key,
