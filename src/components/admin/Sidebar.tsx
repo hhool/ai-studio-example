@@ -62,6 +62,12 @@ export default function Sidebar({ activeMenu, setActiveMenu, lang, onClose }: Si
           label={lang === "zh" ? "全球资讯" : "Global News"} 
         />
         <MenuItem 
+          active={activeMenu === "assets"} 
+          onClick={() => setActiveMenu("assets")} 
+          icon={<Globe className="w-5 h-5" />} 
+          label={lang === "zh" ? "资源库" : "Assets"} 
+        />
+        <MenuItem 
           active={activeMenu === "settings"} 
           onClick={() => setActiveMenu("settings")} 
           icon={<SettingsIcon className="w-5 h-5" />} 

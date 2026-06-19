@@ -22,6 +22,7 @@ import EvaluationManager from "./admin/EvaluationManager";
 import GuideManager from "./admin/GuideManager";
 import NewsManager from "./admin/NewsManager";
 import SettingsManager from "./admin/SettingsManager";
+const AssetUploader = React.lazy(() => import("./admin/AssetUploader"));
 
 export default function AdminPanel({ 
   onClose, 
@@ -38,7 +39,7 @@ export default function AdminPanel({
   loading: boolean,
   onDeveloperBypass?: () => void
 }) {
-  const [activeMenu, setActiveMenu] = useState<"dashboard" | "products" | "evaluations" | "guides" | "news" | "settings">("dashboard");
+  const [activeMenu, setActiveMenu] = useState<"dashboard" | "products" | "evaluations" | "guides" | "news" | "settings" | "assets">("dashboard");
   const [syncing, setSyncing] = useState(false);
   const [showHelpTip, setShowHelpTip] = useState(false);
   const [copiedField, setCopiedField] = useState<string | null>(null);
@@ -204,6 +205,13 @@ export default function AdminPanel({
            {activeMenu === "guides" && <GuideManager lang={lang} />}
            {activeMenu === "news" && <NewsManager lang={lang} />}
            {activeMenu === "settings" && <SettingsManager lang={lang} />}
+           {activeMenu === "assets" && (
+             <div className="p-6">
+               <React.Suspense fallback={<div className="animate-pulse">Loading Asset Manager...</div>}>
+                 <AssetUploader lang={lang} />
+               </React.Suspense>
+             </div>
+           )}
         </div>
       </main>
 

@@ -161,4 +161,62 @@ Please reply strictly in clear English. Deliver answers formatted in structured,
   }
 });
 
+import { storageAdapter } from "./lib/storage/index.js";
+import multer from "multer";
+import path from "path";
+import fs from "fs";
+import { fileURLToPath } from "url";
+
+// Local storage upload handling
+const __filenamePath = fileURLToPath(import.meta.url);
+const __dirnamePath = path.dirname(__filenamePath);
+const UPLOADS_DIR = path.join(__dirnamePath, "../../uploads");
+
+const upload = multer({
+  storage: multer.diskStorage({
+    destination: (req, file, cb) => {
+      // Create nested directories if they don't exist
+      const key = req.query.key as string;
+      if (!key) return cb(new Error("Key is required"), UPLOADS_DIR);
+      
+      const dir = path.dirname(path.join(UPLOADS_DIR, key));
+      fs.mkdirSync(dir, { recursive: true });
+      cb(null, dir);
+    },
+    filename: (req, file, cb) => {
+      const key = req.query.key as string;
+      const fileName = path.basename(key);
+      cb(null, fileName);
+    }
+  })
+});
+
+// Asset endpoints
+app.post("/api/assets/presign", async (req, res) => {
+  try {
+    const { key, contentType } = req.body;
+    if (!key) return res.status(400).json({ error: "Missing key" });
+    const urls = await storageAdapter.getUploadUrl(key, contentType);
+    res.json(urls);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post("/api/assets/upload-local", upload.single("file"), (req, res) => {
+  res.json({ success: true });
+});
+
+app.delete("/api/assets", async (req, res) => {
+  try {
+    const { key } = req.query;
+    if (!key || typeof key !== 'string') return res.status(400).json({ error: "Missing key" });
+    
+    await storageAdapter.deleteAsset(key);
+    res.json({ success: true });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 export { app };
