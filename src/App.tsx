@@ -62,6 +62,7 @@ import AdminPanel from "./components/AdminPanel";
 import { auth } from "./lib/firebase";
 import { getBookmarksFromFirestore, addBookmarkToFirestore, removeBookmarkFromFirestore } from "./lib/firestoreService";
 import { checkIsAdmin, getCMSSettings, getCMSProducts, getCMSEvaluations, seedProductsToFirestore, seedEvaluationsToFirestore, seedGuidesToFirestore, seedNewsToFirestore } from "./lib/cmsService";
+import { fetchContentBundle, isScrapedContentSource } from "./lib/contentSource";
 
 const DEFAULT_SEO_CONFIGS: Record<string, { zh: SEOConfig; en: SEOConfig }> = {
   home: {
@@ -316,26 +317,63 @@ export default function App() {
 
   // Load CMS settings, Products, and Evaluations on mount / tab change
   useEffect(() => {
+    let isActive = true;
+
+    const loadCmsData = async () => {
+      const s = await getCMSSettings();
+      if (!isActive) return;
+      if (s) {
+        setCmsSettings(s);
+      }
+
+      const p = await getCMSProducts(true);
+      if (!isActive) return;
+      if (p && p.length > 0) {
+        setProductsData(p);
+      } else {
+        setProductsData(defaultProductsData);
+      }
+
+      const evs = await getCMSEvaluations(true);
+      if (!isActive) return;
+      setEvaluationsData(evs);
+    };
+
     const fetchData = async () => {
+      if (!isScrapedContentSource()) {
+        try {
+          await loadCmsData();
+        } catch (err) {
+          console.error("Failed to load CMS data:", err);
+        }
+        return;
+      }
+
       try {
-        const s = await getCMSSettings();
-        if (s) {
-          setCmsSettings(s);
+        const bundle = await fetchContentBundle();
+        if (!isActive) return;
+
+        if (bundle.settings && bundle.products.length > 0 && bundle.evaluations.length > 0) {
+          setCmsSettings(bundle.settings);
+          setProductsData(bundle.products);
+          setEvaluationsData(bundle.evaluations);
+          return;
         }
-        const p = await getCMSProducts(true);
-        if (p && p.length > 0) {
-          setProductsData(p);
-        } else {
-          setProductsData(defaultProductsData);
-        }
-        
-        const evs = await getCMSEvaluations(true);
-        setEvaluationsData(evs);
+
+        throw new Error("Content bundle is incomplete.");
       } catch (err) {
-        console.error("Failed to load CMS data:", err);
+        console.warn("Failed to load scraped content bundle, falling back to CMS data:", err);
+        try {
+          await loadCmsData();
+        } catch (fallbackErr) {
+          console.error("Failed to load CMS fallback data:", fallbackErr);
+        }
       }
     };
     fetchData();
+    return () => {
+      isActive = false;
+    };
   }, [activeTab]);
 
   // Synchronize bookmarked products whenever productsData or login state changes
