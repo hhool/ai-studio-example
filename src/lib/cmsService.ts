@@ -12,7 +12,7 @@ import {
   deleteDoc
 } from "firebase/firestore";
 import { db, auth } from "./firebase";
-import { CMSProduct, Evaluation, Guide, News, CMSSettings } from "../types";
+import { CMSProduct, Evaluation, Guide, News, CMSSettings, CMSCategory, CMSScenario } from "../types";
 import { handleFirestoreError, OperationType, withTimeout } from "./firestoreHelper";
 
 import { User } from "firebase/auth";
@@ -354,6 +354,70 @@ export async function saveCMSNews(news: News) {
   }
 }
 
+// Category Management
+export async function getCMSCategories(onlyPublished = false): Promise<CMSCategory[]> {
+  const path = "categories";
+  try {
+    let q;
+    if (onlyPublished) {
+      q = query(collection(db, "categories"), where("status", "==", "published"), orderBy("sortOrder", "asc"));
+    } else {
+      q = query(collection(db, "categories"), orderBy("sortOrder", "asc"));
+    }
+    const snap = await withTimeout(getDocs(q), 5000);
+    return snap.docs.map((d) => d.data() as CMSCategory);
+  } catch (error) {
+    handleFirestoreError(error, OperationType.LIST, path);
+    return [];
+  }
+}
+
+export async function saveCMSCategory(category: CMSCategory) {
+  const path = `categories/${category.id}`;
+  try {
+    const cDoc = doc(db, "categories", category.id);
+    const purified = cleanUndefinedValues({
+      ...category,
+      updatedAt: serverTimestamp(),
+    });
+    await withTimeout(setDoc(cDoc, purified));
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, path);
+  }
+}
+
+// Scenario Management
+export async function getCMSScenarios(onlyPublished = false): Promise<CMSScenario[]> {
+  const path = "scenarios";
+  try {
+    let q;
+    if (onlyPublished) {
+      q = query(collection(db, "scenarios"), where("status", "==", "published"), orderBy("sortOrder", "asc"));
+    } else {
+      q = query(collection(db, "scenarios"), orderBy("sortOrder", "asc"));
+    }
+    const snap = await withTimeout(getDocs(q), 5000);
+    return snap.docs.map((d) => d.data() as CMSScenario);
+  } catch (error) {
+    handleFirestoreError(error, OperationType.LIST, path);
+    return [];
+  }
+}
+
+export async function saveCMSScenario(scenario: CMSScenario) {
+  const path = `scenarios/${scenario.id}`;
+  try {
+    const sDoc = doc(db, "scenarios", scenario.id);
+    const purified = cleanUndefinedValues({
+      ...scenario,
+      updatedAt: serverTimestamp(),
+    });
+    await withTimeout(setDoc(sDoc, purified));
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, path);
+  }
+}
+
 // Global Settings
 export async function getCMSSettings(): Promise<CMSSettings | null> {
   const path = "settings/global";
@@ -420,6 +484,30 @@ export async function deleteCMSNews(id: string): Promise<boolean> {
   try {
     const nDoc = doc(db, "news", id);
     await withTimeout(deleteDoc(nDoc), 5000);
+    return true;
+  } catch (error) {
+    handleFirestoreError(error, OperationType.DELETE, path);
+    return false;
+  }
+}
+
+export async function deleteCMSCategory(id: string): Promise<boolean> {
+  const path = `categories/${id}`;
+  try {
+    const cDoc = doc(db, "categories", id);
+    await withTimeout(deleteDoc(cDoc), 5000);
+    return true;
+  } catch (error) {
+    handleFirestoreError(error, OperationType.DELETE, path);
+    return false;
+  }
+}
+
+export async function deleteCMSScenario(id: string): Promise<boolean> {
+  const path = `scenarios/${id}`;
+  try {
+    const sDoc = doc(db, "scenarios", id);
+    await withTimeout(deleteDoc(sDoc), 5000);
     return true;
   } catch (error) {
     handleFirestoreError(error, OperationType.DELETE, path);

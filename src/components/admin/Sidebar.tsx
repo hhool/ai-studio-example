@@ -2,6 +2,8 @@ import React from "react";
 import { 
   LayoutDashboard, 
   Package, 
+  Layers,
+  Map,
   Star, 
   BookOpen, 
   Globe, 
@@ -42,6 +44,18 @@ export default function Sidebar({ activeMenu, setActiveMenu, lang, onClose }: Si
           onClick={() => setActiveMenu("products")} 
           icon={<Package className="w-5 h-5" />} 
           label={lang === "zh" ? "产品中心" : "Products"} 
+        />
+        <MenuItem 
+          active={activeMenu === "categories"} 
+          onClick={() => setActiveMenu("categories")} 
+          icon={<Layers className="w-5 h-5" />} 
+          label={lang === "zh" ? "品类管理" : "Categories"} 
+        />
+        <MenuItem 
+          active={activeMenu === "scenarios"} 
+          onClick={() => setActiveMenu("scenarios")} 
+          icon={<Map className="w-5 h-5" />} 
+          label={lang === "zh" ? "场景管理" : "Scenarios"} 
         />
         <MenuItem 
           active={activeMenu === "evaluations"} 

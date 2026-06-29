@@ -34,6 +34,13 @@ export interface ProductImageAsset {
   order?: number;
 }
 
+export interface ProductVideoAsset {
+  url: string;
+  title?: string;
+  source?: "cms" | "scraped" | "unknown";
+  order?: number;
+}
+
 export interface ProductImages {
   cover?: ProductImageAsset;
   gallery?: ProductImageAsset[];
@@ -57,6 +64,10 @@ export interface Product {
   imageUrl: string;
   galleryUrls?: string[];
   videoUrl?: string;
+  features?: string[];
+  scenarios?: string[];
+  relatedProductIds?: string[];
+  videos?: ProductVideoAsset[];
   status?: "draft" | "published" | "archived";
   // Added evaluation fields for summary views
   overallScore?: number;
@@ -87,6 +98,39 @@ export interface CMSProduct extends Product {
     pros?: string[];
     cons?: string[];
     editorVerdict?: string;
+  };
+  updatedAt: any;
+}
+
+export interface CMSCategory {
+  id: string;
+  code: ProductCategory;
+  status: "draft" | "published" | "archived";
+  sortOrder: number;
+  icon?: string;
+  zh: {
+    name: string;
+    description?: string;
+  };
+  en: {
+    name: string;
+    description?: string;
+  };
+  updatedAt: any;
+}
+
+export interface CMSScenario {
+  id: string;
+  code: string;
+  status: "draft" | "published" | "archived";
+  sortOrder: number;
+  zh: {
+    name: string;
+    description?: string;
+  };
+  en: {
+    name: string;
+    description?: string;
   };
   updatedAt: any;
 }
@@ -142,6 +186,8 @@ export interface Guide {
     title: string;
     content: string;
   };
+  relatedProductIds?: string[];
+  scenarioIds?: string[];
   updatedAt: any;
 }
 
@@ -162,6 +208,8 @@ export interface News {
     title: string;
     content: string;
   };
+  relatedProductIds?: string[];
+  scenarioIds?: string[];
   updatedAt: any;
 }
 

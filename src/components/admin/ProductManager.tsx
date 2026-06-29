@@ -10,14 +10,23 @@ import {
   AlertTriangle
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
-import { getCMSProducts, saveCMSProduct, deleteCMSProduct } from "../../lib/cmsService";
-import { CMSProduct, ComplianceTag, ProductCategory } from "../../types";
+import { getCMSProducts, saveCMSProduct, deleteCMSProduct, getCMSScenarios } from "../../lib/cmsService";
+import { CMSProduct, ComplianceTag, ProductCategory, CMSScenario } from "../../types";
 import { FALLBACK_PRODUCT_IMAGE, resolveProductImages } from "../../lib/productImages";
 import SmartImage from "../common/SmartImage";
 
 function normalizeProductImagesForSave(product: CMSProduct): CMSProduct {
   const imageSet = resolveProductImages(product);
   const hasRealCover = imageSet.coverUrl && imageSet.coverUrl !== FALLBACK_PRODUCT_IMAGE;
+  const nextVideos = (product.videos || [])
+    .map((v, idx) => ({
+      ...v,
+      url: (v.url || "").trim(),
+      order: typeof v.order === "number" ? v.order : idx,
+    }))
+    .filter((v) => v.url.length > 0);
+
+  const normalizedVideoUrl = nextVideos[0]?.url || (product.videoUrl || "").trim();
 
   return {
     ...product,
@@ -27,11 +36,17 @@ function normalizeProductImagesForSave(product: CMSProduct): CMSProduct {
     },
     imageUrl: hasRealCover ? imageSet.coverUrl : "",
     galleryUrls: imageSet.galleryUrls,
+    videos: nextVideos,
+    videoUrl: normalizedVideoUrl,
+    features: (product.features || []).map((f) => f.trim()).filter(Boolean),
+    scenarios: (product.scenarios || []).map((s) => s.trim()).filter(Boolean),
+    relatedProductIds: (product.relatedProductIds || []).map((id) => id.trim()).filter(Boolean),
   };
 }
 
 export default function ProductManager({ lang }: { lang: "zh" | "en" }) {
   const [products, setProducts] = useState<CMSProduct[]>([]);
+  const [scenarios, setScenarios] = useState<CMSScenario[]>([]);
   const [search, setSearch] = useState("");
   const [editingProduct, setEditingProduct] = useState<CMSProduct | null>(null);
 
@@ -40,8 +55,12 @@ export default function ProductManager({ lang }: { lang: "zh" | "en" }) {
   }, []);
 
   const fetchProducts = async () => {
-    const data = await getCMSProducts();
-    setProducts(data);
+    const [productsData, scenariosData] = await Promise.all([
+      getCMSProducts(),
+      getCMSScenarios(true),
+    ]);
+    setProducts(productsData);
+    setScenarios(scenariosData);
   };
 
   const handleNew = () => {
@@ -65,6 +84,10 @@ export default function ProductManager({ lang }: { lang: "zh" | "en" }) {
       imageUrl: "",
       galleryUrls: [],
       videoUrl: "",
+      features: [],
+      scenarios: [],
+      relatedProductIds: [],
+      videos: [],
       status: "draft",
       zh: { name: "", description: "", brandText: "", specsText: "", pros: [], cons: [], editorVerdict: "" },
       en: { name: "", description: "", brandText: "", specsText: "", pros: [], cons: [], editorVerdict: "" },
@@ -208,6 +231,8 @@ export default function ProductManager({ lang }: { lang: "zh" | "en" }) {
         {editingProduct && (
           <ProductEditor 
             product={editingProduct} 
+            allProducts={products}
+            scenarios={scenarios}
             onSave={handleSave} 
             saving={saving}
             error={saveError}
@@ -220,7 +245,7 @@ export default function ProductManager({ lang }: { lang: "zh" | "en" }) {
   );
 }
 
-function ProductEditor({ product, onSave, onCancel, lang, saving, error }: any) {
+function ProductEditor({ product, allProducts, scenarios, onSave, onCancel, lang, saving, error }: any) {
   const [formData, setFormData] = useState<CMSProduct>(product);
   const [activeTab, setActiveTab] = useState<"base" | "zh" | "en" | "compare">("compare");
 
@@ -359,6 +384,54 @@ function ProductEditor({ product, onSave, onCancel, lang, saving, error }: any) 
                 </div>
               </Section>
 
+              <Section title="Product Features / Scenarios / Relations">
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                  <TagEditor
+                    title="Features"
+                    items={formData.features || []}
+                    addLabel="Add Feature"
+                    onChange={(next) => setFormData({ ...formData, features: next })}
+                  />
+                  <TagEditor
+                    title="Scenarios"
+                    items={formData.scenarios || []}
+                    addLabel="Add Scenario"
+                    onChange={(next) => setFormData({ ...formData, scenarios: next })}
+                    options={(scenarios || []).map((item: CMSScenario) => ({
+                      value: item.code,
+                      label: `${item.zh.name || item.code} / ${item.en.name || item.code}`,
+                    }))}
+                  />
+                  <div className="space-y-3">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Similar Products (Manual)</label>
+                    <div className="max-h-64 overflow-y-auto border border-slate-100 rounded-2xl p-3 bg-slate-50/50 space-y-2">
+                      {allProducts
+                        .filter((p: CMSProduct) => p.id !== formData.id)
+                        .map((p: CMSProduct) => {
+                          const checked = (formData.relatedProductIds || []).includes(p.id);
+                          return (
+                            <label key={p.id} className="flex items-start gap-2 p-2 rounded-xl hover:bg-white cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={checked}
+                                onChange={(e) => {
+                                  const current = formData.relatedProductIds || [];
+                                  const next = e.target.checked
+                                    ? [...current, p.id]
+                                    : current.filter((id) => id !== p.id);
+                                  setFormData({ ...formData, relatedProductIds: next });
+                                }}
+                                className="mt-1"
+                              />
+                              <span className="text-xs font-bold text-slate-700 leading-tight">{p.zh.name || p.en.name || p.id}</span>
+                            </label>
+                          );
+                        })}
+                    </div>
+                  </div>
+                </div>
+              </Section>
+
               <Section title="Evaluation Summary Scores (0-10)">
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                   <Field label="Overall Score" type="number" value={formData.overallScore || 0} onChange={(v) => setFormData({...formData, overallScore: parseFloat(v) || 0})} />
@@ -394,6 +467,52 @@ function ProductEditor({ product, onSave, onCancel, lang, saving, error }: any) 
                       }}
                     />
                     <Field label="Video showcase URL (YouTube/Direct)" value={formData.videoUrl || ""} onChange={(v) => setFormData({...formData, videoUrl: v})} />
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Video List (Structured)</label>
+                      {(formData.videos || []).map((video, idx) => (
+                        <div key={idx} className="grid grid-cols-1 sm:grid-cols-[1fr_180px_auto] gap-2">
+                          <input
+                            className="bg-slate-50 py-3 px-4 rounded-xl font-bold text-xs outline-none border border-transparent focus:border-orange-500 focus:bg-white transition-all"
+                            placeholder="Video URL"
+                            value={video.url || ""}
+                            onChange={(e) => {
+                              const next = [...(formData.videos || [])];
+                              next[idx] = { ...next[idx], url: e.target.value };
+                              setFormData({ ...formData, videos: next, videoUrl: idx === 0 ? e.target.value : formData.videoUrl });
+                            }}
+                          />
+                          <input
+                            className="bg-slate-50 py-3 px-4 rounded-xl font-bold text-xs outline-none border border-transparent focus:border-orange-500 focus:bg-white transition-all"
+                            placeholder="Title"
+                            value={video.title || ""}
+                            onChange={(e) => {
+                              const next = [...(formData.videos || [])];
+                              next[idx] = { ...next[idx], title: e.target.value };
+                              setFormData({ ...formData, videos: next });
+                            }}
+                          />
+                          <button
+                            onClick={() => {
+                              const next = (formData.videos || []).filter((_, i) => i !== idx);
+                              setFormData({ ...formData, videos: next, videoUrl: next[0]?.url || "" });
+                            }}
+                            className="p-3 bg-red-50 text-red-400 rounded-xl hover:bg-red-100 transition-all"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ))}
+                      <button
+                        onClick={() => setFormData({
+                          ...formData,
+                          videos: [...(formData.videos || []), { url: "", title: "", source: "cms" }],
+                        })}
+                        className="w-full py-3 border-2 border-dashed border-slate-200 rounded-xl text-slate-400 text-xs font-black hover:border-orange-500 hover:text-orange-500 transition-all flex items-center justify-center gap-2"
+                      >
+                        <Plus className="w-4 h-4" />
+                        Add Video Item
+                      </button>
+                    </div>
                     <div className="bg-slate-50 border border-slate-100 rounded-2xl p-4">
                       <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Asset Preview</p>
                       <div className="w-full h-36 bg-white rounded-xl border border-slate-100 p-3 flex items-center justify-center">
@@ -449,6 +568,76 @@ function ProductEditor({ product, onSave, onCancel, lang, saving, error }: any) 
           )}
         </div>
       </motion.div>
+    </div>
+  );
+}
+
+function TagEditor({
+  title,
+  items,
+  onChange,
+  addLabel,
+  options,
+}: {
+  title: string;
+  items: string[];
+  onChange: (items: string[]) => void;
+  addLabel: string;
+  options?: Array<{ value: string; label: string }>;
+}) {
+  return (
+    <div className="space-y-3">
+      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{title}</label>
+      {options && options.length > 0 && (
+        <div className="space-y-2">
+          <label className="text-[10px] font-black text-slate-300 uppercase tracking-widest">Preset Options</label>
+          <select
+            className="w-full bg-slate-50 py-3 px-4 rounded-xl font-bold text-xs outline-none border border-transparent focus:border-orange-500 focus:bg-white transition-all"
+            value=""
+            onChange={(e) => {
+              const value = e.target.value;
+              if (!value) return;
+              if (!items.includes(value)) {
+                onChange([...items, value]);
+              }
+              e.currentTarget.value = "";
+            }}
+          >
+            <option value="">Select preset...</option>
+            {options.map((option) => (
+              <option key={option.value} value={option.value}>{option.label}</option>
+            ))}
+          </select>
+        </div>
+      )}
+      <div className="space-y-2">
+        {items.map((item, idx) => (
+          <div key={idx} className="flex gap-2">
+            <input
+              className="flex-1 bg-slate-50 py-3 px-4 rounded-xl font-bold text-xs outline-none border border-transparent focus:border-orange-500 focus:bg-white transition-all"
+              value={item}
+              onChange={(e) => {
+                const next = [...items];
+                next[idx] = e.target.value;
+                onChange(next);
+              }}
+            />
+            <button
+              onClick={() => onChange(items.filter((_, i) => i !== idx))}
+              className="p-3 bg-red-50 text-red-400 rounded-xl hover:bg-red-100 transition-all"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
+          </div>
+        ))}
+        <button
+          onClick={() => onChange([...items, ""]) }
+          className="w-full py-3 border-2 border-dashed border-slate-200 rounded-xl text-slate-400 text-xs font-black hover:border-orange-500 hover:text-orange-500 transition-all flex items-center justify-center gap-2"
+        >
+          <Plus className="w-4 h-4" />
+          {addLabel}
+        </button>
+      </div>
     </div>
   );
 }

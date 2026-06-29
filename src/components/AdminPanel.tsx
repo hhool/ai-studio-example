@@ -18,6 +18,8 @@ import { translateProduct } from "../lib/translate";
 import Sidebar from "./admin/Sidebar";
 import Dashboard from "./admin/Dashboard";
 import ProductManager from "./admin/ProductManager";
+import CategoryManager from "./admin/CategoryManager";
+import ScenarioManager from "./admin/ScenarioManager";
 import EvaluationManager from "./admin/EvaluationManager";
 import GuideManager from "./admin/GuideManager";
 import NewsManager from "./admin/NewsManager";
@@ -39,7 +41,7 @@ export default function AdminPanel({
   loading: boolean,
   onDeveloperBypass?: () => void
 }) {
-  const [activeMenu, setActiveMenu] = useState<"dashboard" | "products" | "evaluations" | "guides" | "news" | "settings" | "assets">("dashboard");
+  const [activeMenu, setActiveMenu] = useState<"dashboard" | "categories" | "scenarios" | "products" | "evaluations" | "guides" | "news" | "settings" | "assets">("dashboard");
   const [syncing, setSyncing] = useState(false);
   const [showHelpTip, setShowHelpTip] = useState(false);
   const [copiedField, setCopiedField] = useState<string | null>(null);
@@ -200,6 +202,8 @@ export default function AdminPanel({
             </div>
           )}
            {activeMenu === "dashboard" && <Dashboard lang={lang} />}
+           {activeMenu === "categories" && <CategoryManager lang={lang} />}
+           {activeMenu === "scenarios" && <ScenarioManager lang={lang} />}
            {activeMenu === "products" && <ProductManager lang={lang} />}
            {activeMenu === "evaluations" && <EvaluationManager lang={lang} />}
            {activeMenu === "guides" && <GuideManager lang={lang} />}

@@ -11,11 +11,13 @@ import {
   Trash2
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
-import { getCMSGuides, saveCMSGuide, deleteCMSGuide } from "../../lib/cmsService";
-import { Guide, RiskCard, SEOConfig } from "../../types";
+import { getCMSGuides, saveCMSGuide, deleteCMSGuide, getCMSProducts, getCMSScenarios } from "../../lib/cmsService";
+import { Guide, RiskCard, SEOConfig, CMSProduct, CMSScenario } from "../../types";
 
 export default function GuideManager({ lang }: { lang: "zh" | "en" }) {
   const [guides, setGuides] = useState<Guide[]>([]);
+  const [products, setProducts] = useState<CMSProduct[]>([]);
+  const [scenarios, setScenarios] = useState<CMSScenario[]>([]);
   const [editingGuide, setEditingGuide] = useState<Guide | null>(null);
 
   useEffect(() => {
@@ -23,8 +25,14 @@ export default function GuideManager({ lang }: { lang: "zh" | "en" }) {
   }, []);
 
   const fetchData = async () => {
-    const data = await getCMSGuides();
-    setGuides(data);
+    const [guidesData, productsData, scenariosData] = await Promise.all([
+      getCMSGuides(),
+      getCMSProducts(),
+      getCMSScenarios(true),
+    ]);
+    setGuides(guidesData);
+    setProducts(productsData);
+    setScenarios(scenariosData);
   };
 
   const handleDelete = async (id: string) => {
@@ -61,6 +69,8 @@ export default function GuideManager({ lang }: { lang: "zh" | "en" }) {
       },
       zh: { title: "", content: "" },
       en: { title: "", content: "" },
+      relatedProductIds: [],
+      scenarioIds: [],
       updatedAt: null
     });
   };
@@ -148,6 +158,8 @@ export default function GuideManager({ lang }: { lang: "zh" | "en" }) {
         {editingGuide && (
           <GuideEditor 
             guide={editingGuide} 
+            products={products}
+            scenarios={scenarios}
             onSave={handleSave} 
             saving={saving}
             error={saveError}
@@ -160,7 +172,7 @@ export default function GuideManager({ lang }: { lang: "zh" | "en" }) {
   );
 }
 
-function GuideEditor({ guide, onSave, onCancel, lang, saving, error }: any) {
+function GuideEditor({ guide, products, scenarios, onSave, onCancel, lang, saving, error }: any) {
   const [formData, setFormData] = useState<Guide>(guide);
   const [activeTab, setActiveTab] = useState<"content" | "risk" | "seo">("content");
   const [activeLang, setActiveLang] = useState<"zh" | "en">("zh");
@@ -257,6 +269,73 @@ function GuideEditor({ guide, onSave, onCancel, lang, saving, error }: any) {
 
             {activeTab === "content" && (
               <div className="max-w-3xl mx-auto space-y-10">
+                <section className="space-y-4 bg-white border border-slate-100 rounded-2xl p-6">
+                  <h4 className="text-xs font-black uppercase tracking-widest text-slate-700">Cross-module Linkage</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Related Products</label>
+                      <select
+                        className="w-full bg-slate-50 border border-slate-200 py-3 px-4 rounded-xl text-xs font-bold"
+                        value=""
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          if (!value) return;
+                          const next = Array.from(new Set([...(formData.relatedProductIds || []), value]));
+                          setFormData({ ...formData, relatedProductIds: next });
+                          e.currentTarget.value = "";
+                        }}
+                      >
+                        <option value="">Select product...</option>
+                        {products.map((p: CMSProduct) => (
+                          <option key={p.id} value={p.id}>{p.zh.name || p.en.name || p.id}</option>
+                        ))}
+                      </select>
+                      <div className="flex flex-wrap gap-2">
+                        {(formData.relatedProductIds || []).map((id) => (
+                          <button
+                            key={id}
+                            onClick={() => setFormData({ ...formData, relatedProductIds: (formData.relatedProductIds || []).filter((item) => item !== id) })}
+                            className="px-2 py-1 rounded-full text-[10px] font-black bg-slate-200 text-slate-700"
+                          >
+                            {id} ×
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Related Scenarios</label>
+                      <select
+                        className="w-full bg-slate-50 border border-slate-200 py-3 px-4 rounded-xl text-xs font-bold"
+                        value=""
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          if (!value) return;
+                          const next = Array.from(new Set([...(formData.scenarioIds || []), value]));
+                          setFormData({ ...formData, scenarioIds: next });
+                          e.currentTarget.value = "";
+                        }}
+                      >
+                        <option value="">Select scenario...</option>
+                        {scenarios.map((s: CMSScenario) => (
+                          <option key={s.id} value={s.code}>{s.zh.name || s.code}</option>
+                        ))}
+                      </select>
+                      <div className="flex flex-wrap gap-2">
+                        {(formData.scenarioIds || []).map((id) => (
+                          <button
+                            key={id}
+                            onClick={() => setFormData({ ...formData, scenarioIds: (formData.scenarioIds || []).filter((item) => item !== id) })}
+                            className="px-2 py-1 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-700"
+                          >
+                            {id} ×
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </section>
+
                 <Field label="Post Title" value={formData[activeLang].title} onChange={(v: string) => {
                   const next = {...formData};
                   next[activeLang].title = v;

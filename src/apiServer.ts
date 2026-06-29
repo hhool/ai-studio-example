@@ -286,6 +286,13 @@ function dedupeUrls(urls: string[]) {
   return out;
 }
 
+function normalizeImageSource(source?: string): "cms" | "scraped" | "unknown" {
+  if (source === "cms" || source === "scraped" || source === "unknown") {
+    return source;
+  }
+  return "scraped";
+}
+
 function normalizeWorkerImages(product: WorkerProduct) {
   const coverCandidates = [
     product.images?.cover?.url || "",
@@ -307,13 +314,13 @@ function normalizeWorkerImages(product: WorkerProduct) {
       cover: coverUrl
         ? {
             url: coverUrl,
-            source: product.images?.cover?.source || "scraped",
+            source: normalizeImageSource(product.images?.cover?.source),
             order: 0,
           }
         : undefined,
       gallery: galleryUrls.map((url, index) => ({
         url,
-        source: product.images?.gallery?.find((item) => (item.url || "").trim() === url)?.source || "scraped",
+        source: normalizeImageSource(product.images?.gallery?.find((item) => (item.url || "").trim() === url)?.source),
         order: index + 1,
       })),
     },
