@@ -15,6 +15,7 @@ import { getCMSNews, saveCMSNews, deleteCMSNews, getCMSProducts, getCMSScenarios
 import { News } from "../../types";
 import { CMSProduct, CMSScenario } from "../../types";
 import BackendResourcePicker from "./BackendResourcePicker";
+import ScenarioPicker from "./ScenarioPicker";
 
 export default function NewsManager({ lang }: { lang: "zh" | "en" }) {
   const [news, setNews] = useState<News[]>([]);
@@ -177,6 +178,7 @@ function NewsEditor({ news, products, scenarios, onSave, onCancel, lang, saving,
   const [formData, setFormData] = useState<News>(news);
   const [activeLang, setActiveLang] = useState<"zh" | "en">("zh");
   const [pickerMode, setPickerMode] = useState<"cover" | "related" | null>(null);
+  const [scenarioPickerOpen, setScenarioPickerOpen] = useState(false);
 
   const applyResourceSelection = (selection: { imageUrls: string[]; videoUrls: string[]; relatedProductIds: string[] }) => {
     if (pickerMode === "cover") {
@@ -299,6 +301,12 @@ function NewsEditor({ news, products, scenarios, onSave, onCancel, lang, saving,
 
               <div className="space-y-2">
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Related Scenarios</label>
+                <button
+                  onClick={() => setScenarioPickerOpen(true)}
+                  className="w-full py-2.5 border border-emerald-200 bg-emerald-50 text-emerald-700 rounded-xl text-[11px] font-black hover:bg-emerald-100 transition-all"
+                >
+                  {lang === "zh" ? "可视化选择场景" : "Visual Scenario Picker"}
+                </button>
                 <select
                   className="w-full bg-white border border-slate-200 py-3 px-4 rounded-xl text-xs font-bold"
                   value=""
@@ -460,6 +468,15 @@ function NewsEditor({ news, products, scenarios, onSave, onCancel, lang, saving,
         lang={lang}
         onClose={() => setPickerMode(null)}
         onApply={applyResourceSelection}
+      />
+
+      <ScenarioPicker
+        open={scenarioPickerOpen}
+        lang={lang}
+        scenarios={scenarios || []}
+        selectedCodes={formData.scenarioIds || []}
+        onClose={() => setScenarioPickerOpen(false)}
+        onApply={(scenarioCodes) => setFormData((prev) => ({ ...prev, scenarioIds: Array.from(new Set(scenarioCodes.filter(Boolean))) }))}
       />
     </div>
   );

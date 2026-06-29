@@ -14,6 +14,7 @@ import { motion, AnimatePresence } from "motion/react";
 import { getCMSGuides, saveCMSGuide, deleteCMSGuide, getCMSProducts, getCMSScenarios } from "../../lib/cmsService";
 import { Guide, RiskCard, SEOConfig, CMSProduct, CMSScenario } from "../../types";
 import BackendResourcePicker from "./BackendResourcePicker";
+import ScenarioPicker from "./ScenarioPicker";
 
 export default function GuideManager({ lang }: { lang: "zh" | "en" }) {
   const [guides, setGuides] = useState<Guide[]>([]);
@@ -178,6 +179,7 @@ function GuideEditor({ guide, products, scenarios, onSave, onCancel, lang, savin
   const [activeTab, setActiveTab] = useState<"content" | "risk" | "seo">("content");
   const [activeLang, setActiveLang] = useState<"zh" | "en">("zh");
   const [pickerMode, setPickerMode] = useState<"cover" | "related" | null>(null);
+  const [scenarioPickerOpen, setScenarioPickerOpen] = useState(false);
 
   const addRiskCard = () => {
     setFormData({
@@ -326,6 +328,12 @@ function GuideEditor({ guide, products, scenarios, onSave, onCancel, lang, savin
 
                     <div className="space-y-2">
                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Related Scenarios</label>
+                      <button
+                        onClick={() => setScenarioPickerOpen(true)}
+                        className="w-full py-2.5 border border-emerald-200 bg-emerald-50 text-emerald-700 rounded-xl text-[11px] font-black hover:bg-emerald-100 transition-all"
+                      >
+                        {lang === "zh" ? "可视化选择场景" : "Visual Scenario Picker"}
+                      </button>
                       <select
                         className="w-full bg-slate-50 border border-slate-200 py-3 px-4 rounded-xl text-xs font-bold"
                         value=""
@@ -474,6 +482,15 @@ function GuideEditor({ guide, products, scenarios, onSave, onCancel, lang, savin
         lang={lang}
         onClose={() => setPickerMode(null)}
         onApply={applyResourceSelection}
+      />
+
+      <ScenarioPicker
+        open={scenarioPickerOpen}
+        lang={lang}
+        scenarios={scenarios || []}
+        selectedCodes={formData.scenarioIds || []}
+        onClose={() => setScenarioPickerOpen(false)}
+        onApply={(scenarioCodes) => setFormData((prev) => ({ ...prev, scenarioIds: Array.from(new Set(scenarioCodes.filter(Boolean))) }))}
       />
     </div>
   );
