@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { 
   Plus, 
   Trash2, 
@@ -7,12 +7,15 @@ import {
   FileText, 
   Search,
   CheckCircle2,
-  AlertTriangle
+  AlertTriangle,
+  Download,
+  Upload
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { getCMSProducts, saveCMSProduct, deleteCMSProduct, getCMSScenarios } from "../../lib/cmsService";
 import { CMSProduct, ComplianceTag, ProductCategory, CMSScenario } from "../../types";
 import { FALLBACK_PRODUCT_IMAGE, resolveProductImages } from "../../lib/productImages";
+import { validateCMSProduct } from "../../lib/productValidation";
 import SmartImage from "../common/SmartImage";
 
 function normalizeProductImagesForSave(product: CMSProduct): CMSProduct {
@@ -49,6 +52,7 @@ export default function ProductManager({ lang }: { lang: "zh" | "en" }) {
   const [scenarios, setScenarios] = useState<CMSScenario[]>([]);
   const [search, setSearch] = useState("");
   const [editingProduct, setEditingProduct] = useState<CMSProduct | null>(null);
+  const importRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     fetchProducts();
@@ -104,10 +108,17 @@ export default function ProductManager({ lang }: { lang: "zh" | "en" }) {
       alert("Please enter product name in both languages.");
       return;
     }
+    const normalized = normalizeProductImagesForSave(p);
+    const validation = validateCMSProduct(normalized);
+    if (!validation.valid) {
+      alert((lang === "zh" ? "发布前校验失败：\n" : "Publish validation failed:\n") + validation.errors.map((item) => `- ${item}`).join("\n"));
+      return;
+    }
+
     setSaving(true);
     setSaveError(null);
     try {
-      await saveCMSProduct(normalizeProductImagesForSave(p));
+      await saveCMSProduct(normalized);
       setEditingProduct(null);
       fetchProducts();
     } catch (e: any) {
@@ -156,6 +167,57 @@ export default function ProductManager({ lang }: { lang: "zh" | "en" }) {
     p.brand.toLowerCase().includes(search.toLowerCase())
   );
 
+  const handleExport = () => {
+    const normalized = products.map((item) => normalizeProductImagesForSave(item));
+    const blob = new Blob([JSON.stringify(normalized, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `products-export-${Date.now()}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleImportFile = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    try {
+      const raw = await file.text();
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed)) {
+        alert(lang === "zh" ? "导入失败：文件必须为产品数组 JSON。" : "Import failed: JSON must be an array of products.");
+        return;
+      }
+
+      const errors: string[] = [];
+      let count = 0;
+      for (const item of parsed) {
+        const candidate = normalizeProductImagesForSave(item as CMSProduct);
+        const result = validateCMSProduct(candidate);
+        if (!result.valid) {
+          errors.push(`${candidate.id || "unknown"}: ${result.errors.join("; ")}`);
+          continue;
+        }
+        await saveCMSProduct(candidate);
+        count += 1;
+      }
+
+      await fetchProducts();
+      if (errors.length > 0) {
+        alert(
+          (lang === "zh" ? `导入完成：成功 ${count} 条，失败 ${errors.length} 条。\n` : `Import done: ${count} succeeded, ${errors.length} failed.\n`) +
+          errors.slice(0, 8).map((e) => `- ${e}`).join("\n")
+        );
+      } else {
+        alert(lang === "zh" ? `导入成功，共 ${count} 条。` : `Import succeeded: ${count} products.`);
+      }
+    } catch (error: any) {
+      alert((lang === "zh" ? "导入失败：" : "Import failed: ") + (error?.message || String(error)));
+    } finally {
+      event.target.value = "";
+    }
+  };
+
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
       <header className="flex items-center justify-between">
@@ -163,10 +225,33 @@ export default function ProductManager({ lang }: { lang: "zh" | "en" }) {
           <h2 className="text-3xl font-black text-slate-900 tracking-tighter uppercase">{lang === "zh" ? "产品中心" : "Product Center"}</h2>
           <p className="text-slate-500 font-medium mt-1">Structured repository for global stroller database.</p>
         </div>
-        <button onClick={handleNew} className="btn-primary flex items-center gap-2 bg-slate-900 text-white px-8 py-4 rounded-3xl font-black shadow-2xl shadow-slate-900/20 hover:-translate-y-1 transition-all">
-          <Plus className="w-5 h-5 text-orange-500" />
-          {lang === "zh" ? "新增产品" : "New Product"}
-        </button>
+        <div className="flex items-center gap-3">
+          <input
+            ref={importRef}
+            type="file"
+            accept="application/json"
+            onChange={handleImportFile}
+            className="hidden"
+          />
+          <button
+            onClick={() => importRef.current?.click()}
+            className="flex items-center gap-2 bg-white border border-slate-200 text-slate-700 px-5 py-3 rounded-2xl font-black text-xs hover:border-emerald-400 hover:text-emerald-600 transition-all"
+          >
+            <Upload className="w-4 h-4" />
+            {lang === "zh" ? "导入 JSON" : "Import JSON"}
+          </button>
+          <button
+            onClick={handleExport}
+            className="flex items-center gap-2 bg-white border border-slate-200 text-slate-700 px-5 py-3 rounded-2xl font-black text-xs hover:border-sky-400 hover:text-sky-600 transition-all"
+          >
+            <Download className="w-4 h-4" />
+            {lang === "zh" ? "导出 JSON" : "Export JSON"}
+          </button>
+          <button onClick={handleNew} className="btn-primary flex items-center gap-2 bg-slate-900 text-white px-8 py-4 rounded-3xl font-black shadow-2xl shadow-slate-900/20 hover:-translate-y-1 transition-all">
+            <Plus className="w-5 h-5 text-orange-500" />
+            {lang === "zh" ? "新增产品" : "New Product"}
+          </button>
+        </div>
       </header>
 
       {/* Filter Bar */}
