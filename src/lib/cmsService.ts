@@ -65,8 +65,23 @@ export async function getCMSProducts(onlyPublished = false): Promise<CMSProduct[
     const snap = await withTimeout(getDocs(q), 5000);
     return snap.docs.map(d => d.data() as CMSProduct);
   } catch (error) {
-    handleFirestoreError(error, OperationType.LIST, path);
-    return [];
+    // Fallback path: if ordered query fails (index/schema/network jitter), still try plain read.
+    try {
+      const snap = await withTimeout(getDocs(collection(db, "products")), 8000);
+      let rows = snap.docs.map((d) => d.data() as CMSProduct);
+      if (onlyPublished) {
+        rows = rows.filter((item) => item?.status === "published");
+      }
+      rows.sort((a, b) => {
+        const aTime = Number((a as any)?.updatedAt?.seconds || 0);
+        const bTime = Number((b as any)?.updatedAt?.seconds || 0);
+        return bTime - aTime;
+      });
+      return rows;
+    } catch (fallbackError) {
+      handleFirestoreError(fallbackError, OperationType.LIST, path);
+      return [];
+    }
   }
 }
 

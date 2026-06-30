@@ -21,6 +21,32 @@ import BackendResourcePicker from "./BackendResourcePicker";
 import { auth } from "../../lib/firebase";
 import { getBackendPickerPayload } from "../../lib/backendResourceService";
 
+function normalizeCMSProductForList(item: CMSProduct): CMSProduct {
+  const zhName = item?.zh?.name || item.name || item.brand || "";
+  const enName = item?.en?.name || item.name || item.brand || "";
+  return {
+    ...item,
+    zh: {
+      name: zhName,
+      description: item?.zh?.description || "",
+      brandText: item?.zh?.brandText || item.brand || "",
+      specsText: item?.zh?.specsText || "",
+      pros: item?.zh?.pros || [],
+      cons: item?.zh?.cons || [],
+      editorVerdict: item?.zh?.editorVerdict || "",
+    },
+    en: {
+      name: enName,
+      description: item?.en?.description || "",
+      brandText: item?.en?.brandText || item.brand || "",
+      specsText: item?.en?.specsText || "",
+      pros: item?.en?.pros || [],
+      cons: item?.en?.cons || [],
+      editorVerdict: item?.en?.editorVerdict || "",
+    },
+  };
+}
+
 function normalizeProductImagesForSave(product: CMSProduct): CMSProduct {
   const imageSet = resolveProductImages(product);
   const hasRealCover = imageSet.coverUrl && imageSet.coverUrl !== FALLBACK_PRODUCT_IMAGE;
@@ -68,7 +94,7 @@ export default function ProductManager({ lang }: { lang: "zh" | "en" }) {
       getCMSScenarios(true),
     ]);
     if (productsData.length > 0) {
-      setProducts(productsData);
+      setProducts(productsData.map((item) => normalizeCMSProductForList(item)));
       setBackendPreviewMode(false);
     } else {
       try {
@@ -225,9 +251,9 @@ export default function ProductManager({ lang }: { lang: "zh" | "en" }) {
   };
 
   const filtered = products.filter(p => 
-    p.zh.name.toLowerCase().includes(search.toLowerCase()) || 
-    p.en.name.toLowerCase().includes(search.toLowerCase()) ||
-    p.brand.toLowerCase().includes(search.toLowerCase())
+    (p.zh?.name || "").toLowerCase().includes(search.toLowerCase()) || 
+    (p.en?.name || "").toLowerCase().includes(search.toLowerCase()) ||
+    (p.brand || "").toLowerCase().includes(search.toLowerCase())
   );
 
   const handleExport = () => {
