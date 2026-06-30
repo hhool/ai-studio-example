@@ -13,10 +13,69 @@ const categoryCodes: ProductCategory[] = [
   "safety_seat",
 ];
 
+const defaultCategoryTemplates: Array<{
+  code: ProductCategory;
+  zhName: string;
+  enName: string;
+  zhDescription: string;
+  enDescription: string;
+}> = [
+  {
+    code: "stroller",
+    zhName: "婴儿推车",
+    enName: "Stroller",
+    zhDescription: "婴幼儿日常出行推车。",
+    enDescription: "Daily mobility strollers for infants and toddlers.",
+  },
+  {
+    code: "balance",
+    zhName: "平衡车",
+    enName: "Balance Bike",
+    zhDescription: "无脚踏平衡训练车。",
+    enDescription: "Pedal-free balance training bikes.",
+  },
+  {
+    code: "bicycle",
+    zhName: "儿童自行车",
+    enName: "Kids Bicycle",
+    zhDescription: "适合儿童骑行的脚踏自行车。",
+    enDescription: "Pedal bicycles designed for children.",
+  },
+  {
+    code: "scooter",
+    zhName: "滑板车",
+    enName: "Scooter",
+    zhDescription: "儿童滑行与通勤滑板车。",
+    enDescription: "Kids scooters for glide and commute use.",
+  },
+  {
+    code: "tricycle",
+    zhName: "三轮车",
+    enName: "Tricycle",
+    zhDescription: "低龄儿童三轮启蒙车型。",
+    enDescription: "Three-wheel beginner vehicles for younger kids.",
+  },
+  {
+    code: "electric_car",
+    zhName: "电动童车",
+    enName: "Electric Ride-on",
+    zhDescription: "儿童电动乘坐类车型。",
+    enDescription: "Electric ride-on vehicles for children.",
+  },
+  {
+    code: "safety_seat",
+    zhName: "安全座椅",
+    enName: "Safety Seat",
+    zhDescription: "儿童汽车安全座椅。",
+    enDescription: "Child safety seats for car travel.",
+  },
+];
+
 export default function CategoryManager({ lang }: { lang: "zh" | "en" }) {
   const [items, setItems] = useState<CMSCategory[]>([]);
   const [editing, setEditing] = useState<CMSCategory | null>(null);
   const [saving, setSaving] = useState(false);
+  const [initializing, setInitializing] = useState(false);
 
   async function refresh() {
     const data = await getCMSCategories(false);
@@ -64,6 +123,49 @@ export default function CategoryManager({ lang }: { lang: "zh" | "en" }) {
     await refresh();
   }
 
+  async function handleInitializeCategories() {
+    const ok = window.confirm(
+      lang === "zh"
+        ? "将初始化默认品类（已存在同 code 的品类会被更新）。是否继续？"
+        : "Initialize default categories now? Existing categories with the same code will be updated."
+    );
+    if (!ok) return;
+
+    setInitializing(true);
+    try {
+      const existing = await getCMSCategories(false);
+      const byCode = new Map(existing.map((item) => [item.code, item]));
+
+      for (const [idx, template] of defaultCategoryTemplates.entries()) {
+        const hit = byCode.get(template.code);
+        const payload: CMSCategory = {
+          id: hit?.id || `cat_${template.code}`,
+          code: template.code,
+          status: hit?.status || "published",
+          sortOrder: hit?.sortOrder ?? idx + 1,
+          icon: hit?.icon || "",
+          zh: {
+            name: template.zhName,
+            description: template.zhDescription,
+          },
+          en: {
+            name: template.enName,
+            description: template.enDescription,
+          },
+          updatedAt: null,
+        };
+        await saveCMSCategory(payload);
+      }
+
+      await refresh();
+      alert(lang === "zh" ? "默认品类初始化完成。" : "Default categories initialized.");
+    } catch (error: any) {
+      alert((lang === "zh" ? "初始化失败：" : "Initialization failed: ") + (error?.message || String(error)));
+    } finally {
+      setInitializing(false);
+    }
+  }
+
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
       <header className="flex items-center justify-between">
@@ -75,13 +177,22 @@ export default function CategoryManager({ lang }: { lang: "zh" | "en" }) {
             {lang === "zh" ? "用于后台产品中心的品类配置与排序" : "Configure and order categories for product center."}
           </p>
         </div>
-        <button
-          onClick={handleNew}
-          className="btn-primary flex items-center gap-2 bg-slate-900 text-white px-8 py-4 rounded-3xl font-black shadow-2xl shadow-slate-900/20 hover:-translate-y-1 transition-all"
-        >
-          <Plus className="w-5 h-5 text-orange-500" />
-          {lang === "zh" ? "新增品类" : "New Category"}
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={handleInitializeCategories}
+            disabled={initializing}
+            className="flex items-center gap-2 bg-white border border-slate-200 text-slate-700 px-6 py-3 rounded-2xl font-black text-xs hover:border-emerald-400 hover:text-emerald-600 transition-all disabled:opacity-60"
+          >
+            {initializing ? (lang === "zh" ? "初始化中..." : "Initializing...") : lang === "zh" ? "初始化品类" : "Initialize Categories"}
+          </button>
+          <button
+            onClick={handleNew}
+            className="btn-primary flex items-center gap-2 bg-slate-900 text-white px-8 py-4 rounded-3xl font-black shadow-2xl shadow-slate-900/20 hover:-translate-y-1 transition-all"
+          >
+            <Plus className="w-5 h-5 text-orange-500" />
+            {lang === "zh" ? "新增品类" : "New Category"}
+          </button>
+        </div>
       </header>
 
       <div className="grid grid-cols-1 gap-4">
