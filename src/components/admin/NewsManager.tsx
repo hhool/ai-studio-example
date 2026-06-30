@@ -14,6 +14,7 @@ import { motion, AnimatePresence } from "motion/react";
 import { getCMSNews, saveCMSNews, deleteCMSNews, getCMSProducts, getCMSScenarios } from "../../lib/cmsService";
 import { News } from "../../types";
 import { CMSProduct, CMSScenario } from "../../types";
+import { deleteD1CMSNews, getD1CMSNews, getD1CMSProducts, getD1CMSScenarios, saveD1CMSNews } from "../../lib/cmsD1Service";
 import BackendResourcePicker from "./BackendResourcePicker";
 import ScenarioPicker from "./ScenarioPicker";
 
@@ -28,11 +29,37 @@ export default function NewsManager({ lang }: { lang: "zh" | "en" }) {
   }, []);
 
   const fetchData = async () => {
-    const [newsData, productsData, scenariosData] = await Promise.all([
-      getCMSNews(),
-      getCMSProducts(),
-      getCMSScenarios(true),
-    ]);
+    let newsData: News[] = [];
+    let productsData: CMSProduct[] = [];
+    let scenariosData: CMSScenario[] = [];
+
+    try {
+      newsData = await getD1CMSNews(false);
+    } catch {
+      newsData = [];
+    }
+    if (newsData.length === 0) {
+      newsData = await getCMSNews();
+    }
+
+    try {
+      productsData = await getD1CMSProducts(false);
+    } catch {
+      productsData = [];
+    }
+    if (productsData.length === 0) {
+      productsData = await getCMSProducts();
+    }
+
+    try {
+      scenariosData = await getD1CMSScenarios(true);
+    } catch {
+      scenariosData = [];
+    }
+    if (scenariosData.length === 0) {
+      scenariosData = await getCMSScenarios(true);
+    }
+
     setNews(newsData);
     setProducts(productsData);
     setScenarios(scenariosData);
@@ -46,7 +73,15 @@ export default function NewsManager({ lang }: { lang: "zh" | "en" }) {
 
     if (window.confirm(confirmMsg)) {
       try {
-        const success = await deleteCMSNews(id);
+        let success = false;
+        try {
+          success = await deleteD1CMSNews(id);
+          if (!success) {
+            throw new Error("D1 delete failed");
+          }
+        } catch {
+          success = await deleteCMSNews(id);
+        }
         if (success) {
           fetchData();
         } else {
@@ -84,7 +119,14 @@ export default function NewsManager({ lang }: { lang: "zh" | "en" }) {
     setSaving(true);
     setSaveError(null);
     try {
-      await saveCMSNews(n);
+      try {
+        const saved = await saveD1CMSNews(n);
+        if (!saved) {
+          throw new Error("D1 save failed");
+        }
+      } catch {
+        await saveCMSNews(n);
+      }
       setEditingNews(null);
       fetchData();
     } catch (e: any) {

@@ -13,6 +13,7 @@ import {
 import { motion, AnimatePresence } from "motion/react";
 import { getCMSGuides, saveCMSGuide, deleteCMSGuide, getCMSProducts, getCMSScenarios } from "../../lib/cmsService";
 import { Guide, RiskCard, SEOConfig, CMSProduct, CMSScenario } from "../../types";
+import { deleteD1CMSGuide, getD1CMSGuides, getD1CMSProducts, getD1CMSScenarios, saveD1CMSGuide } from "../../lib/cmsD1Service";
 import BackendResourcePicker from "./BackendResourcePicker";
 import ScenarioPicker from "./ScenarioPicker";
 
@@ -27,11 +28,37 @@ export default function GuideManager({ lang }: { lang: "zh" | "en" }) {
   }, []);
 
   const fetchData = async () => {
-    const [guidesData, productsData, scenariosData] = await Promise.all([
-      getCMSGuides(),
-      getCMSProducts(),
-      getCMSScenarios(true),
-    ]);
+    let guidesData: Guide[] = [];
+    let productsData: CMSProduct[] = [];
+    let scenariosData: CMSScenario[] = [];
+
+    try {
+      guidesData = await getD1CMSGuides(false);
+    } catch {
+      guidesData = [];
+    }
+    if (guidesData.length === 0) {
+      guidesData = await getCMSGuides();
+    }
+
+    try {
+      productsData = await getD1CMSProducts(false);
+    } catch {
+      productsData = [];
+    }
+    if (productsData.length === 0) {
+      productsData = await getCMSProducts();
+    }
+
+    try {
+      scenariosData = await getD1CMSScenarios(true);
+    } catch {
+      scenariosData = [];
+    }
+    if (scenariosData.length === 0) {
+      scenariosData = await getCMSScenarios(true);
+    }
+
     setGuides(guidesData);
     setProducts(productsData);
     setScenarios(scenariosData);
@@ -45,7 +72,15 @@ export default function GuideManager({ lang }: { lang: "zh" | "en" }) {
 
     if (window.confirm(confirmMsg)) {
       try {
-        const success = await deleteCMSGuide(id);
+        let success = false;
+        try {
+          success = await deleteD1CMSGuide(id);
+          if (!success) {
+            throw new Error("D1 delete failed");
+          }
+        } catch {
+          success = await deleteCMSGuide(id);
+        }
         if (success) {
           fetchData();
         } else {
@@ -84,7 +119,14 @@ export default function GuideManager({ lang }: { lang: "zh" | "en" }) {
     setSaving(true);
     setSaveError(null);
     try {
-      await saveCMSGuide(g);
+      try {
+        const saved = await saveD1CMSGuide(g);
+        if (!saved) {
+          throw new Error("D1 save failed");
+        }
+      } catch {
+        await saveCMSGuide(g);
+      }
       setEditingGuide(null);
       fetchData();
     } catch (e: any) {

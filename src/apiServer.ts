@@ -2,7 +2,7 @@ import express from "express";
 import { GoogleGenAI } from "@google/genai";
 import { guideArticles } from "./data/guidesData.js";
 import { newsArticles } from "./data/newsData.js";
-import type { CMSCategory, CMSProduct, CMSSettings, Evaluation, HomeSlot, ProductCategory } from "./types.js";
+import type { CMSCategory, CMSProduct, CMSScenario, CMSSettings, Evaluation, Guide, HomeSlot, News, ProductCategory } from "./types.js";
 import dotenv from "dotenv";
 
 // Load environment variables
@@ -134,6 +134,8 @@ type D1QueryResponse = {
   }>;
 };
 
+type D1Collection = "products" | "categories" | "scenarios" | "evaluations" | "guides" | "news";
+
 function getD1Config() {
   const accountId = (process.env.CLOUDFLARE_ACCOUNT_ID || "").trim();
   const databaseId = (process.env.CLOUDFLARE_D1_DATABASE_ID || "").trim();
@@ -187,7 +189,7 @@ async function ensureD1Schema() {
   );
 }
 
-async function upsertD1CMSRecord(collectionName: "products" | "categories", id: string, payload: any) {
+async function upsertD1CMSRecord(collectionName: D1Collection, id: string, payload: any) {
   await d1Query(
     `INSERT INTO cms_records (collection, id, payload, updated_at)
      VALUES (?, ?, ?, ?)
@@ -197,11 +199,11 @@ async function upsertD1CMSRecord(collectionName: "products" | "categories", id: 
   );
 }
 
-async function deleteD1CMSRecord(collectionName: "products" | "categories", id: string) {
+async function deleteD1CMSRecord(collectionName: D1Collection, id: string) {
   await d1Query(`DELETE FROM cms_records WHERE collection = ? AND id = ?`, [collectionName, id]);
 }
 
-async function listD1CMSRecords<T>(collectionName: "products" | "categories"): Promise<T[]> {
+async function listD1CMSRecords<T>(collectionName: D1Collection): Promise<T[]> {
   const rows = await d1Query(
     `SELECT payload FROM cms_records WHERE collection = ? ORDER BY updated_at DESC`,
     [collectionName]
@@ -897,6 +899,78 @@ app.get("/api/cms/products", async (req, res) => {
   }
 });
 
+app.get("/api/cms/scenarios", async (req, res) => {
+  try {
+    if (!hasD1Config()) {
+      res.status(503).json({ error: "D1 is not configured." });
+      return;
+    }
+    await ensureD1Schema();
+    const rows = await listD1CMSRecords<CMSScenario>("scenarios");
+    const onlyPublished = String(req.query.onlyPublished || "").toLowerCase() === "1" || String(req.query.onlyPublished || "").toLowerCase() === "true";
+    const filtered = onlyPublished ? rows.filter((item) => item?.status === "published") : rows;
+    filtered.sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
+    res.json({ data: filtered });
+  } catch (error: any) {
+    console.error("Failed to list D1 scenarios:", error);
+    res.status(500).json({ error: error.message || "Failed to list D1 scenarios" });
+  }
+});
+
+app.get("/api/cms/evaluations", async (req, res) => {
+  try {
+    if (!hasD1Config()) {
+      res.status(503).json({ error: "D1 is not configured." });
+      return;
+    }
+    await ensureD1Schema();
+    const rows = await listD1CMSRecords<Evaluation>("evaluations");
+    const onlyPublished = String(req.query.onlyPublished || "").toLowerCase() === "1" || String(req.query.onlyPublished || "").toLowerCase() === "true";
+    const filtered = onlyPublished ? rows.filter((item) => item?.status === "published") : rows;
+    filtered.sort((a, b) => String((b as any)?.updatedAt || "").localeCompare(String((a as any)?.updatedAt || "")));
+    res.json({ data: filtered });
+  } catch (error: any) {
+    console.error("Failed to list D1 evaluations:", error);
+    res.status(500).json({ error: error.message || "Failed to list D1 evaluations" });
+  }
+});
+
+app.get("/api/cms/guides", async (req, res) => {
+  try {
+    if (!hasD1Config()) {
+      res.status(503).json({ error: "D1 is not configured." });
+      return;
+    }
+    await ensureD1Schema();
+    const rows = await listD1CMSRecords<Guide>("guides");
+    const onlyPublished = String(req.query.onlyPublished || "").toLowerCase() === "1" || String(req.query.onlyPublished || "").toLowerCase() === "true";
+    const filtered = onlyPublished ? rows.filter((item) => item?.status === "published") : rows;
+    filtered.sort((a, b) => String((b as any)?.updatedAt || "").localeCompare(String((a as any)?.updatedAt || "")));
+    res.json({ data: filtered });
+  } catch (error: any) {
+    console.error("Failed to list D1 guides:", error);
+    res.status(500).json({ error: error.message || "Failed to list D1 guides" });
+  }
+});
+
+app.get("/api/cms/news", async (req, res) => {
+  try {
+    if (!hasD1Config()) {
+      res.status(503).json({ error: "D1 is not configured." });
+      return;
+    }
+    await ensureD1Schema();
+    const rows = await listD1CMSRecords<News>("news");
+    const onlyPublished = String(req.query.onlyPublished || "").toLowerCase() === "1" || String(req.query.onlyPublished || "").toLowerCase() === "true";
+    const filtered = onlyPublished ? rows.filter((item) => item?.status === "published") : rows;
+    filtered.sort((a, b) => String((b as any)?.updatedAt || "").localeCompare(String((a as any)?.updatedAt || "")));
+    res.json({ data: filtered });
+  } catch (error: any) {
+    console.error("Failed to list D1 news:", error);
+    res.status(500).json({ error: error.message || "Failed to list D1 news" });
+  }
+});
+
 app.post("/api/cms/init/categories", async (_req, res) => {
   try {
     if (!hasD1Config()) {
@@ -989,6 +1063,52 @@ app.post("/api/cms/categories/delete", async (req, res) => {
   }
 });
 
+app.post("/api/cms/scenarios/save", async (req, res) => {
+  try {
+    if (!hasD1Config()) {
+      res.status(503).json({ error: "D1 is not configured." });
+      return;
+    }
+    const payload = (req.body || {}) as CMSScenario;
+    if (!payload?.id) {
+      res.status(400).json({ error: "Scenario payload with id is required." });
+      return;
+    }
+
+    await ensureD1Schema();
+    await upsertD1CMSRecord("scenarios", payload.id, {
+      ...payload,
+      updatedAt: new Date().toISOString(),
+    });
+
+    res.json({ data: { id: payload.id, saved: true } });
+  } catch (error: any) {
+    console.error("Failed to save D1 scenario:", error);
+    res.status(500).json({ error: error.message || "Failed to save D1 scenario" });
+  }
+});
+
+app.post("/api/cms/scenarios/delete", async (req, res) => {
+  try {
+    if (!hasD1Config()) {
+      res.status(503).json({ error: "D1 is not configured." });
+      return;
+    }
+    const id = String(req.body?.id || "").trim();
+    if (!id) {
+      res.status(400).json({ error: "Scenario id is required." });
+      return;
+    }
+
+    await ensureD1Schema();
+    await deleteD1CMSRecord("scenarios", id);
+    res.json({ data: { id, deleted: true } });
+  } catch (error: any) {
+    console.error("Failed to delete D1 scenario:", error);
+    res.status(500).json({ error: error.message || "Failed to delete D1 scenario" });
+  }
+});
+
 app.post("/api/cms/init/products", async (_req, res) => {
   try {
     if (!hasD1Config()) {
@@ -1073,6 +1193,141 @@ app.post("/api/cms/products/delete", async (req, res) => {
   } catch (error: any) {
     console.error("Failed to delete D1 product:", error);
     res.status(500).json({ error: error.message || "Failed to delete D1 product" });
+  }
+});
+
+app.post("/api/cms/evaluations/save", async (req, res) => {
+  try {
+    if (!hasD1Config()) {
+      res.status(503).json({ error: "D1 is not configured." });
+      return;
+    }
+    const payload = (req.body || {}) as Evaluation;
+    if (!payload?.id) {
+      res.status(400).json({ error: "Evaluation payload with id is required." });
+      return;
+    }
+
+    await ensureD1Schema();
+    await upsertD1CMSRecord("evaluations", payload.id, {
+      ...payload,
+      updatedAt: new Date().toISOString(),
+    });
+    res.json({ data: { id: payload.id, saved: true } });
+  } catch (error: any) {
+    console.error("Failed to save D1 evaluation:", error);
+    res.status(500).json({ error: error.message || "Failed to save D1 evaluation" });
+  }
+});
+
+app.post("/api/cms/evaluations/delete", async (req, res) => {
+  try {
+    if (!hasD1Config()) {
+      res.status(503).json({ error: "D1 is not configured." });
+      return;
+    }
+    const id = String(req.body?.id || "").trim();
+    if (!id) {
+      res.status(400).json({ error: "Evaluation id is required." });
+      return;
+    }
+
+    await ensureD1Schema();
+    await deleteD1CMSRecord("evaluations", id);
+    res.json({ data: { id, deleted: true } });
+  } catch (error: any) {
+    console.error("Failed to delete D1 evaluation:", error);
+    res.status(500).json({ error: error.message || "Failed to delete D1 evaluation" });
+  }
+});
+
+app.post("/api/cms/guides/save", async (req, res) => {
+  try {
+    if (!hasD1Config()) {
+      res.status(503).json({ error: "D1 is not configured." });
+      return;
+    }
+    const payload = (req.body || {}) as Guide;
+    if (!payload?.id) {
+      res.status(400).json({ error: "Guide payload with id is required." });
+      return;
+    }
+
+    await ensureD1Schema();
+    await upsertD1CMSRecord("guides", payload.id, {
+      ...payload,
+      updatedAt: new Date().toISOString(),
+    });
+    res.json({ data: { id: payload.id, saved: true } });
+  } catch (error: any) {
+    console.error("Failed to save D1 guide:", error);
+    res.status(500).json({ error: error.message || "Failed to save D1 guide" });
+  }
+});
+
+app.post("/api/cms/guides/delete", async (req, res) => {
+  try {
+    if (!hasD1Config()) {
+      res.status(503).json({ error: "D1 is not configured." });
+      return;
+    }
+    const id = String(req.body?.id || "").trim();
+    if (!id) {
+      res.status(400).json({ error: "Guide id is required." });
+      return;
+    }
+
+    await ensureD1Schema();
+    await deleteD1CMSRecord("guides", id);
+    res.json({ data: { id, deleted: true } });
+  } catch (error: any) {
+    console.error("Failed to delete D1 guide:", error);
+    res.status(500).json({ error: error.message || "Failed to delete D1 guide" });
+  }
+});
+
+app.post("/api/cms/news/save", async (req, res) => {
+  try {
+    if (!hasD1Config()) {
+      res.status(503).json({ error: "D1 is not configured." });
+      return;
+    }
+    const payload = (req.body || {}) as News;
+    if (!payload?.id) {
+      res.status(400).json({ error: "News payload with id is required." });
+      return;
+    }
+
+    await ensureD1Schema();
+    await upsertD1CMSRecord("news", payload.id, {
+      ...payload,
+      updatedAt: new Date().toISOString(),
+    });
+    res.json({ data: { id: payload.id, saved: true } });
+  } catch (error: any) {
+    console.error("Failed to save D1 news:", error);
+    res.status(500).json({ error: error.message || "Failed to save D1 news" });
+  }
+});
+
+app.post("/api/cms/news/delete", async (req, res) => {
+  try {
+    if (!hasD1Config()) {
+      res.status(503).json({ error: "D1 is not configured." });
+      return;
+    }
+    const id = String(req.body?.id || "").trim();
+    if (!id) {
+      res.status(400).json({ error: "News id is required." });
+      return;
+    }
+
+    await ensureD1Schema();
+    await deleteD1CMSRecord("news", id);
+    res.json({ data: { id, deleted: true } });
+  } catch (error: any) {
+    console.error("Failed to delete D1 news:", error);
+    res.status(500).json({ error: error.message || "Failed to delete D1 news" });
   }
 });
 

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Plus, Save, Trash2 } from "lucide-react";
 import { CMSScenario } from "../../types";
 import { deleteCMSScenario, getCMSScenarios, saveCMSScenario } from "../../lib/cmsService";
+import { deleteD1CMSScenario, getD1CMSScenarios, saveD1CMSScenario } from "../../lib/cmsD1Service";
 
 export default function ScenarioManager({ lang }: { lang: "zh" | "en" }) {
   const [items, setItems] = useState<CMSScenario[]>([]);
@@ -9,6 +10,15 @@ export default function ScenarioManager({ lang }: { lang: "zh" | "en" }) {
   const [saving, setSaving] = useState(false);
 
   async function refresh() {
+    try {
+      const data = await getD1CMSScenarios(false);
+      if (data.length > 0) {
+        setItems(data);
+        return;
+      }
+    } catch {
+      // fallback
+    }
     const data = await getCMSScenarios(false);
     setItems(data);
   }
@@ -37,7 +47,14 @@ export default function ScenarioManager({ lang }: { lang: "zh" | "en" }) {
     }
     setSaving(true);
     try {
-      await saveCMSScenario(editing);
+      try {
+        const saved = await saveD1CMSScenario(editing);
+        if (!saved) {
+          throw new Error("D1 save failed");
+        }
+      } catch {
+        await saveCMSScenario(editing);
+      }
       setEditing(null);
       await refresh();
     } finally {
@@ -48,7 +65,14 @@ export default function ScenarioManager({ lang }: { lang: "zh" | "en" }) {
   async function handleDelete(id: string) {
     const ok = window.confirm(lang === "zh" ? "确认删除该场景？" : "Delete this scenario?");
     if (!ok) return;
-    await deleteCMSScenario(id);
+    try {
+      const deleted = await deleteD1CMSScenario(id);
+      if (!deleted) {
+        throw new Error("D1 delete failed");
+      }
+    } catch {
+      await deleteCMSScenario(id);
+    }
     if (editing?.id === id) setEditing(null);
     await refresh();
   }

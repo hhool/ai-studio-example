@@ -14,6 +14,7 @@ import {
 import { motion, AnimatePresence } from "motion/react";
 import { getCMSEvaluations, saveCMSEvaluation, getCMSProducts, deleteCMSEvaluation } from "../../lib/cmsService";
 import { Evaluation, CMSProduct, RadarScores } from "../../types";
+import { deleteD1CMSEvaluation, getD1CMSEvaluations, getD1CMSProducts, saveD1CMSEvaluation } from "../../lib/cmsD1Service";
 
 export default function EvaluationManager({ lang }: { lang: "zh" | "en" }) {
   const [evaluations, setEvaluations] = useState<Evaluation[]>([]);
@@ -25,10 +26,27 @@ export default function EvaluationManager({ lang }: { lang: "zh" | "en" }) {
   }, []);
 
   const fetchData = async () => {
-    const [evs, prods] = await Promise.all([
-      getCMSEvaluations(),
-      getCMSProducts()
-    ]);
+    let evs: Evaluation[] = [];
+    let prods: CMSProduct[] = [];
+
+    try {
+      evs = await getD1CMSEvaluations(false);
+    } catch {
+      evs = [];
+    }
+    if (evs.length === 0) {
+      evs = await getCMSEvaluations();
+    }
+
+    try {
+      prods = await getD1CMSProducts(false);
+    } catch {
+      prods = [];
+    }
+    if (prods.length === 0) {
+      prods = await getCMSProducts();
+    }
+
     setEvaluations(evs);
     setProducts(prods);
   };
@@ -41,7 +59,15 @@ export default function EvaluationManager({ lang }: { lang: "zh" | "en" }) {
 
     if (window.confirm(confirmMsg)) {
       try {
-        const success = await deleteCMSEvaluation(id);
+        let success = false;
+        try {
+          success = await deleteD1CMSEvaluation(id);
+          if (!success) {
+            throw new Error("D1 delete failed");
+          }
+        } catch {
+          success = await deleteCMSEvaluation(id);
+        }
         if (success) {
           fetchData();
         } else {
@@ -82,7 +108,14 @@ export default function EvaluationManager({ lang }: { lang: "zh" | "en" }) {
     setSaving(true);
     setSaveError(null);
     try {
-      await saveCMSEvaluation(ev);
+      try {
+        const saved = await saveD1CMSEvaluation(ev);
+        if (!saved) {
+          throw new Error("D1 save failed");
+        }
+      } catch {
+        await saveCMSEvaluation(ev);
+      }
       setEditingEv(null);
       fetchData();
     } catch (e: any) {

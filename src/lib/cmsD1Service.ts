@@ -1,4 +1,4 @@
-import { CMSCategory, CMSProduct } from "../types";
+import { CMSCategory, CMSProduct, CMSScenario, Evaluation, Guide, News } from "../types";
 
 async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(path, {
@@ -27,6 +27,30 @@ export async function getD1CMSProducts(onlyPublished = false): Promise<CMSProduc
 export async function getD1CMSCategories(onlyPublished = false): Promise<CMSCategory[]> {
   const query = onlyPublished ? "?onlyPublished=1" : "";
   const response = await requestJson<{ data?: CMSCategory[] }>(`/api/cms/categories${query}`);
+  return response?.data || [];
+}
+
+export async function getD1CMSScenarios(onlyPublished = false): Promise<CMSScenario[]> {
+  const query = onlyPublished ? "?onlyPublished=1" : "";
+  const response = await requestJson<{ data?: CMSScenario[] }>(`/api/cms/scenarios${query}`);
+  return response?.data || [];
+}
+
+export async function getD1CMSEvaluations(onlyPublished = false): Promise<Evaluation[]> {
+  const query = onlyPublished ? "?onlyPublished=1" : "";
+  const response = await requestJson<{ data?: Evaluation[] }>(`/api/cms/evaluations${query}`);
+  return response?.data || [];
+}
+
+export async function getD1CMSGuides(onlyPublished = false): Promise<Guide[]> {
+  const query = onlyPublished ? "?onlyPublished=1" : "";
+  const response = await requestJson<{ data?: Guide[] }>(`/api/cms/guides${query}`);
+  return response?.data || [];
+}
+
+export async function getD1CMSNews(onlyPublished = false): Promise<News[]> {
+  const query = onlyPublished ? "?onlyPublished=1" : "";
+  const response = await requestJson<{ data?: News[] }>(`/api/cms/news${query}`);
   return response?.data || [];
 }
 
@@ -59,8 +83,72 @@ export async function saveD1CMSCategory(category: CMSCategory): Promise<boolean>
   return Boolean(response?.data?.saved);
 }
 
+export async function saveD1CMSScenario(scenario: CMSScenario): Promise<boolean> {
+  const response = await requestJson<{ data?: { saved?: boolean } }>("/api/cms/scenarios/save", {
+    method: "POST",
+    body: JSON.stringify(scenario),
+  });
+  return Boolean(response?.data?.saved);
+}
+
+export async function saveD1CMSEvaluation(evaluation: Evaluation): Promise<boolean> {
+  const response = await requestJson<{ data?: { saved?: boolean } }>("/api/cms/evaluations/save", {
+    method: "POST",
+    body: JSON.stringify(evaluation),
+  });
+  return Boolean(response?.data?.saved);
+}
+
+export async function saveD1CMSGuide(guide: Guide): Promise<boolean> {
+  const response = await requestJson<{ data?: { saved?: boolean } }>("/api/cms/guides/save", {
+    method: "POST",
+    body: JSON.stringify(guide),
+  });
+  return Boolean(response?.data?.saved);
+}
+
+export async function saveD1CMSNews(news: News): Promise<boolean> {
+  const response = await requestJson<{ data?: { saved?: boolean } }>("/api/cms/news/save", {
+    method: "POST",
+    body: JSON.stringify(news),
+  });
+  return Boolean(response?.data?.saved);
+}
+
 export async function deleteD1CMSCategory(id: string): Promise<boolean> {
   const response = await requestJson<{ data?: { deleted?: boolean } }>("/api/cms/categories/delete", {
+    method: "POST",
+    body: JSON.stringify({ id }),
+  });
+  return Boolean(response?.data?.deleted);
+}
+
+export async function deleteD1CMSScenario(id: string): Promise<boolean> {
+  const response = await requestJson<{ data?: { deleted?: boolean } }>("/api/cms/scenarios/delete", {
+    method: "POST",
+    body: JSON.stringify({ id }),
+  });
+  return Boolean(response?.data?.deleted);
+}
+
+export async function deleteD1CMSEvaluation(id: string): Promise<boolean> {
+  const response = await requestJson<{ data?: { deleted?: boolean } }>("/api/cms/evaluations/delete", {
+    method: "POST",
+    body: JSON.stringify({ id }),
+  });
+  return Boolean(response?.data?.deleted);
+}
+
+export async function deleteD1CMSGuide(id: string): Promise<boolean> {
+  const response = await requestJson<{ data?: { deleted?: boolean } }>("/api/cms/guides/delete", {
+    method: "POST",
+    body: JSON.stringify({ id }),
+  });
+  return Boolean(response?.data?.deleted);
+}
+
+export async function deleteD1CMSNews(id: string): Promise<boolean> {
+  const response = await requestJson<{ data?: { deleted?: boolean } }>("/api/cms/news/delete", {
     method: "POST",
     body: JSON.stringify({ id }),
   });
