@@ -11,7 +11,7 @@ import {
   serverTimestamp,
   deleteDoc
 } from "firebase/firestore";
-import { db, auth } from "./firebase";
+import { db, dbDefault, auth } from "./firebase";
 import { CMSProduct, Evaluation, Guide, News, CMSSettings, CMSCategory, CMSScenario } from "../types";
 import { handleFirestoreError, OperationType, withTimeout } from "./firestoreHelper";
 
@@ -56,18 +56,34 @@ export async function checkIsAdmin(uid: string, user?: User | null): Promise<boo
 export async function getCMSProducts(onlyPublished = false): Promise<CMSProduct[]> {
   const path = "products";
 
-  const runPlainReadFallback = async () => {
-    const snap = await withTimeout(getDocs(collection(db, "products")), 8000);
-    let rows = snap.docs.map((d) => d.data() as CMSProduct);
-    if (onlyPublished) {
-      rows = rows.filter((item) => item?.status === "published");
-    }
-    rows.sort((a, b) => {
+  const sortRows = (rows: CMSProduct[]) => {
+    const next = [...rows];
+    next.sort((a, b) => {
       const aTime = Number((a as any)?.updatedAt?.seconds || 0);
       const bTime = Number((b as any)?.updatedAt?.seconds || 0);
       return bTime - aTime;
     });
-    return rows;
+    return next;
+  };
+
+  const runPlainReadFallback = async (targetDb = db) => {
+    const snap = await withTimeout(getDocs(collection(targetDb, "products")), 8000);
+    let rows = snap.docs.map((d) => d.data() as CMSProduct);
+    if (onlyPublished) {
+      rows = rows.filter((item) => item?.status === "published");
+    }
+    return sortRows(rows);
+  };
+
+  const runDefaultDbFallbackIfNeeded = async (currentRows: CMSProduct[]) => {
+    if (currentRows.length > 0 || db === dbDefault) {
+      return currentRows;
+    }
+    try {
+      return await runPlainReadFallback(dbDefault);
+    } catch {
+      return currentRows;
+    }
   };
 
   try {
@@ -82,14 +98,16 @@ export async function getCMSProducts(onlyPublished = false): Promise<CMSProduct[
 
     // Some legacy docs may not have updatedAt and can be omitted by orderBy queries.
     if (!onlyPublished && rows.length === 0) {
-      return runPlainReadFallback();
+      const fallbackRows = await runPlainReadFallback();
+      return runDefaultDbFallbackIfNeeded(fallbackRows);
     }
 
-    return rows;
+    return runDefaultDbFallbackIfNeeded(rows);
   } catch (error) {
     // Fallback path: if ordered query fails (index/schema/network jitter), still try plain read.
     try {
-      return runPlainReadFallback();
+      const fallbackRows = await runPlainReadFallback();
+      return runDefaultDbFallbackIfNeeded(fallbackRows);
     } catch (fallbackError) {
       handleFirestoreError(fallbackError, OperationType.LIST, path);
       return [];
