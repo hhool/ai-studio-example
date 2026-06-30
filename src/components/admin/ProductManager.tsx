@@ -20,6 +20,7 @@ import SmartImage from "../common/SmartImage";
 import BackendResourcePicker from "./BackendResourcePicker";
 import { auth } from "../../lib/firebase";
 import { getBackendPickerPayload } from "../../lib/backendResourceService";
+import { getD1CMSProducts, initD1CMSProducts } from "../../lib/cmsD1Service";
 
 function normalizeCMSProductForList(item: CMSProduct): CMSProduct {
   const zhName = item?.zh?.name || item.name || item.brand || "";
@@ -158,10 +159,19 @@ export default function ProductManager({ lang }: { lang: "zh" | "en" }) {
   }, []);
 
   const fetchProducts = async () => {
-    const [productsData, scenariosData] = await Promise.all([
-      getCMSProducts(),
-      getCMSScenarios(true),
-    ]);
+    let productsData: CMSProduct[] = [];
+    const scenariosData = await getCMSScenarios(true);
+
+    try {
+      productsData = await getD1CMSProducts(false);
+    } catch {
+      productsData = [];
+    }
+
+    if (productsData.length === 0) {
+      productsData = await getCMSProducts();
+    }
+
     if (productsData.length > 0) {
       setProducts(productsData.map((item) => normalizeCMSProductForList(item)));
       setBackendPreviewMode(false);
@@ -282,6 +292,19 @@ export default function ProductManager({ lang }: { lang: "zh" | "en" }) {
 
     setInitializingProducts(true);
     try {
+      try {
+        const d1Result = await initD1CMSProducts();
+        await fetchProducts();
+        alert(
+          lang === "zh"
+            ? `D1 初始化完成：成功 ${d1Result.success}/${d1Result.total} 条。`
+            : `D1 initialization complete: ${d1Result.success}/${d1Result.total} succeeded.`
+        );
+        return;
+      } catch {
+        // fallback to existing firestore init path
+      }
+
       const payload = await getBackendPickerPayload({ includeAll: true });
       const sourceRows = (payload.products || []).slice(0, 120);
       let success = 0;

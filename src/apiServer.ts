@@ -2,7 +2,7 @@ import express from "express";
 import { GoogleGenAI } from "@google/genai";
 import { guideArticles } from "./data/guidesData.js";
 import { newsArticles } from "./data/newsData.js";
-import type { CMSProduct, CMSSettings, Evaluation, HomeSlot, ProductCategory } from "./types.js";
+import type { CMSCategory, CMSProduct, CMSSettings, Evaluation, HomeSlot, ProductCategory } from "./types.js";
 import dotenv from "dotenv";
 
 // Load environment variables
@@ -122,6 +122,165 @@ async function fetchWorkerJson<T>(pathname: string): Promise<T> {
   }
 
   return (await response.json()) as T;
+}
+
+type D1QueryResponse = {
+  success?: boolean;
+  errors?: Array<{ message?: string }>;
+  result?: Array<{
+    success?: boolean;
+    error?: string;
+    results?: any[];
+  }>;
+};
+
+function getD1Config() {
+  const accountId = (process.env.CLOUDFLARE_ACCOUNT_ID || "").trim();
+  const databaseId = (process.env.CLOUDFLARE_D1_DATABASE_ID || "").trim();
+  const apiToken = (process.env.CLOUDFLARE_API_TOKEN || "").trim();
+  return { accountId, databaseId, apiToken };
+}
+
+function hasD1Config() {
+  const config = getD1Config();
+  return Boolean(config.accountId && config.databaseId && config.apiToken);
+}
+
+async function d1Query(sql: string, params: any[] = []): Promise<any[]> {
+  const { accountId, databaseId, apiToken } = getD1Config();
+  if (!accountId || !databaseId || !apiToken) {
+    throw new Error("Cloudflare D1 config missing. Please set CLOUDFLARE_ACCOUNT_ID/CLOUDFLARE_D1_DATABASE_ID/CLOUDFLARE_API_TOKEN.");
+  }
+
+  const endpoint = `https://api.cloudflare.com/client/v4/accounts/${accountId}/d1/database/${databaseId}/query`;
+  const response = await fetch(endpoint, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${apiToken}`,
+    },
+    body: JSON.stringify({ sql, params }),
+  });
+
+  const payload = (await response.json().catch(() => ({}))) as D1QueryResponse;
+  if (!response.ok || payload.success === false) {
+    const apiError = payload.errors?.map((item) => item?.message).filter(Boolean).join(";") || response.statusText;
+    throw new Error(`D1 query failed: ${apiError}`);
+  }
+
+  const first = payload.result?.[0];
+  if (!first || first.success === false) {
+    throw new Error(`D1 query execution failed: ${first?.error || "unknown error"}`);
+  }
+  return first.results || [];
+}
+
+async function ensureD1Schema() {
+  await d1Query(
+    `CREATE TABLE IF NOT EXISTS cms_records (
+      collection TEXT NOT NULL,
+      id TEXT NOT NULL,
+      payload TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      PRIMARY KEY (collection, id)
+    )`
+  );
+}
+
+async function upsertD1CMSRecord(collectionName: "products" | "categories", id: string, payload: any) {
+  await d1Query(
+    `INSERT INTO cms_records (collection, id, payload, updated_at)
+     VALUES (?, ?, ?, ?)
+     ON CONFLICT(collection, id)
+     DO UPDATE SET payload = excluded.payload, updated_at = excluded.updated_at`,
+    [collectionName, id, JSON.stringify(payload), new Date().toISOString()]
+  );
+}
+
+async function listD1CMSRecords<T>(collectionName: "products" | "categories"): Promise<T[]> {
+  const rows = await d1Query(
+    `SELECT payload FROM cms_records WHERE collection = ? ORDER BY updated_at DESC`,
+    [collectionName]
+  );
+  return rows
+    .map((item: any) => {
+      try {
+        return JSON.parse(String(item?.payload || "{}")) as T;
+      } catch {
+        return null;
+      }
+    })
+    .filter(Boolean) as T[];
+}
+
+function buildCMSCategoryFromWorker(item: WorkerCategory, index: number): CMSCategory {
+  const code = mapWorkerCategoryToProductCategory(item.categoryId);
+  return {
+    id: `cat_${code}`,
+    code,
+    status: "published",
+    sortOrder: index + 1,
+    icon: "",
+    zh: {
+      name: item.name || code,
+      description: `backend:${item.categoryId}`,
+    },
+    en: {
+      name: item.name || code,
+      description: `backend:${item.categoryId}`,
+    },
+    updatedAt: new Date().toISOString(),
+  };
+}
+
+function buildCMSProductFromResourceRow(row: AdminResourceProduct): CMSProduct {
+  return {
+    id: row.id,
+    name: row.title,
+    brand: row.brand || "Unknown",
+    category: mapWorkerCategoryToProductCategory(row.categoryId),
+    wheelSize: "N/A",
+    weight: 0,
+    material: "N/A",
+    brakeType: "N/A",
+    tireType: "N/A",
+    price: 0,
+    ageRange: mapCategoryToAgeRange(row.categoryId),
+    heightRange: mapCategoryToHeightRange(row.categoryId),
+    compliance: ["EN1888"],
+    imageUrl: row.coverImage || "",
+    galleryUrls: row.galleryImages || [],
+    videoUrl: row.videoUrls?.[0] || "",
+    videos: (row.videoUrls || []).map((url, idx) => ({
+      url,
+      title: `init-video-${idx + 1}`,
+      source: "scraped",
+      order: idx,
+    })),
+    features: ["backend-imported", "d1-init"],
+    scenarios: ["city-commute"],
+    relatedProductIds: [],
+    status: "draft",
+    zh: {
+      name: row.title,
+      description: "由 backend 原始数据初始化到 D1。",
+      brandText: row.brand || "Unknown",
+      specsText: "Initialized from backend resources.",
+      pros: ["backend source"],
+      cons: ["needs editorial enrichment"],
+      editorVerdict: "建议补充评测文案后发布。",
+    },
+    en: {
+      name: row.title,
+      description: "Initialized into D1 from backend source data.",
+      brandText: row.brand || "Unknown",
+      specsText: "Initialized from backend resources.",
+      pros: ["backend source"],
+      cons: ["needs editorial enrichment"],
+      editorVerdict: "Please enrich editorial content before publishing.",
+    },
+    updatedAt: new Date().toISOString(),
+  };
 }
 
 function mapWorkerCategoryToProductCategory(categoryId: string): ProductCategory {
@@ -553,109 +712,217 @@ app.get("/api/content/bundle", async (req, res) => {
   }
 });
 
-app.get("/api/content/resources", async (req, res) => {
-  try {
-    const requestedCategory = typeof req.query.categoryId === "string" ? req.query.categoryId.trim() : "";
-    const query = typeof req.query.q === "string" ? req.query.q.trim().toLowerCase() : "";
-    const includeAllCategories = String(req.query.all || "").toLowerCase() === "1" || String(req.query.all || "").toLowerCase() === "true";
+async function buildAdminResourcePayload(options?: { categoryId?: string; q?: string; includeAll?: boolean }) {
+  const requestedCategory = (options?.categoryId || "").trim();
+  const query = (options?.q || "").trim().toLowerCase();
 
-    const categoriesResponse = await fetchWorkerJson<{ data: WorkerCategory[] }>("/api/v1/catalog/categories");
-    const categories = Array.isArray(categoriesResponse.data) ? categoriesResponse.data : [];
-    if (categories.length === 0) {
-      res.json({ data: { categories: [], products: [] } });
-      return;
+  const categoriesResponse = await fetchWorkerJson<{ data: WorkerCategory[] }>("/api/v1/catalog/categories");
+  const categories = Array.isArray(categoriesResponse.data) ? categoriesResponse.data : [];
+  if (categories.length === 0) {
+    return { categories: [] as Array<{ categoryId: string; name: string }>, products: [] as AdminResourceProduct[] };
+  }
+
+  const selectedCategories = requestedCategory
+    ? categories.filter((item) => item.categoryId === requestedCategory)
+    : options?.includeAll
+      ? categories
+      : categories.slice(0, 5);
+
+  const payloads = await Promise.all(
+    selectedCategories.map(async (category) => {
+      const [productsResponse, resourcesResponse] = await Promise.all([
+        fetchWorkerJson<{ data: WorkerProduct[] }>(
+          `/api/v1/products?categoryId=${encodeURIComponent(category.categoryId)}&page=1&pageSize=40`
+        ),
+        fetchWorkerJson<{ data: WorkerResource[] }>(
+          `/api/v1/resources?categoryId=${encodeURIComponent(category.categoryId)}&page=1&pageSize=60`
+        ),
+      ]);
+      return {
+        category,
+        products: Array.isArray(productsResponse.data) ? productsResponse.data : [],
+        resources: Array.isArray(resourcesResponse.data) ? resourcesResponse.data : [],
+      };
+    })
+  );
+
+  const resultProducts: AdminResourceProduct[] = [];
+
+  for (const payload of payloads) {
+    const videoMap = new Map<string, string[]>();
+
+    for (const resource of payload.resources) {
+      const urls = dedupeUrls([
+        ...((resource.videoUrls || []).filter((item) => isHttpUrl(item))),
+        resource.resourceUrl || "",
+        resource.source || "",
+      ]);
+      const isVideo = (resource.resourceType || "").toLowerCase().includes("video") || urls.length > 0;
+      if (!isVideo) {
+        continue;
+      }
+      const current = videoMap.get(resource.productId) || [];
+      videoMap.set(resource.productId, dedupeUrls([...current, ...urls]));
     }
 
-    const selectedCategories = requestedCategory
-      ? categories.filter((item) => item.categoryId === requestedCategory)
-      : includeAllCategories
-        ? categories
-        : categories.slice(0, 5);
+    for (const product of payload.products) {
+      const coverImage = (product.images?.cover?.url || product.coverImage || "").trim();
+      const galleryImages = dedupeUrls([
+        ...(product.galleryUrls || []),
+        ...(product.images?.gallery || []).map((item) => (item.url || "").trim()),
+      ].filter((item) => isHttpUrl(item)));
 
-    const payloads = await Promise.all(
-      selectedCategories.map(async (category) => {
-        const [productsResponse, resourcesResponse] = await Promise.all([
-          fetchWorkerJson<{ data: WorkerProduct[] }>(
-            `/api/v1/products?categoryId=${encodeURIComponent(category.categoryId)}&page=1&pageSize=40`
-          ),
-          fetchWorkerJson<{ data: WorkerResource[] }>(
-            `/api/v1/resources?categoryId=${encodeURIComponent(category.categoryId)}&page=1&pageSize=60`
-          ),
-        ]);
-        return {
-          category,
-          products: Array.isArray(productsResponse.data) ? productsResponse.data : [],
-          resources: Array.isArray(resourcesResponse.data) ? resourcesResponse.data : [],
-        };
-      })
-    );
+      const videoUrls = dedupeUrls([
+        ...((product.videoUrls || []).filter((item) => isHttpUrl(item))),
+        ...(videoMap.get(product.productId) || []),
+      ]);
 
-    const resultProducts: AdminResourceProduct[] = [];
+      const row: AdminResourceProduct = {
+        id: product.productId,
+        categoryId: product.categoryId,
+        title: product.title,
+        brand: product.brand,
+        coverImage: isHttpUrl(coverImage) ? coverImage : undefined,
+        galleryImages,
+        videoUrls,
+      };
 
-    for (const payload of payloads) {
-      const videoMap = new Map<string, string[]>();
-
-      for (const resource of payload.resources) {
-        const urls = dedupeUrls([
-          ...((resource.videoUrls || []).filter((item) => isHttpUrl(item))),
-          resource.resourceUrl || "",
-          resource.source || "",
-        ]);
-        const isVideo = (resource.resourceType || "").toLowerCase().includes("video") || urls.length > 0;
-        if (!isVideo) {
+      if (query) {
+        const text = `${row.title} ${row.brand} ${row.id}`.toLowerCase();
+        if (!text.includes(query)) {
           continue;
         }
-        const current = videoMap.get(resource.productId) || [];
-        videoMap.set(resource.productId, dedupeUrls([...current, ...urls]));
       }
 
-      for (const product of payload.products) {
-        const coverImage = (product.images?.cover?.url || product.coverImage || "").trim();
-        const galleryImages = dedupeUrls([
-          ...(product.galleryUrls || []),
-          ...(product.images?.gallery || []).map((item) => (item.url || "").trim()),
-        ].filter((item) => isHttpUrl(item)));
-
-        const videoUrls = dedupeUrls([
-          ...((product.videoUrls || []).filter((item) => isHttpUrl(item))),
-          ...(videoMap.get(product.productId) || []),
-        ]);
-
-        const row: AdminResourceProduct = {
-          id: product.productId,
-          categoryId: product.categoryId,
-          title: product.title,
-          brand: product.brand,
-          coverImage: isHttpUrl(coverImage) ? coverImage : undefined,
-          galleryImages,
-          videoUrls,
-        };
-
-        if (query) {
-          const text = `${row.title} ${row.brand} ${row.id}`.toLowerCase();
-          if (!text.includes(query)) {
-            continue;
-          }
-        }
-
-        resultProducts.push(row);
-      }
+      resultProducts.push(row);
     }
+  }
 
-    res.json({
-      data: {
-        categories: selectedCategories.map((item) => ({
-          categoryId: item.categoryId,
-          name: item.name,
-        })),
-        products: resultProducts,
-      },
+  return {
+    categories: selectedCategories.map((item) => ({
+      categoryId: item.categoryId,
+      name: item.name,
+    })),
+    products: resultProducts,
+  };
+}
+
+app.get("/api/content/resources", async (req, res) => {
+  try {
+    const includeAllCategories = String(req.query.all || "").toLowerCase() === "1" || String(req.query.all || "").toLowerCase() === "true";
+    const data = await buildAdminResourcePayload({
+      categoryId: typeof req.query.categoryId === "string" ? req.query.categoryId : "",
+      q: typeof req.query.q === "string" ? req.query.q : "",
+      includeAll: includeAllCategories,
     });
+
+    res.json({ data });
   } catch (error: any) {
     console.error("Failed to load admin resource picker payload:", error);
     res.status(502).json({
       error: error.message || "Failed to load resource picker payload",
     });
+  }
+});
+
+app.get("/api/cms/categories", async (req, res) => {
+  try {
+    if (!hasD1Config()) {
+      res.status(503).json({ error: "D1 is not configured." });
+      return;
+    }
+    await ensureD1Schema();
+    const rows = await listD1CMSRecords<CMSCategory>("categories");
+    const onlyPublished = String(req.query.onlyPublished || "").toLowerCase() === "1" || String(req.query.onlyPublished || "").toLowerCase() === "true";
+    const filtered = onlyPublished ? rows.filter((item) => item?.status === "published") : rows;
+    filtered.sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
+    res.json({ data: filtered });
+  } catch (error: any) {
+    console.error("Failed to list D1 categories:", error);
+    res.status(500).json({ error: error.message || "Failed to list D1 categories" });
+  }
+});
+
+app.get("/api/cms/products", async (req, res) => {
+  try {
+    if (!hasD1Config()) {
+      res.status(503).json({ error: "D1 is not configured." });
+      return;
+    }
+    await ensureD1Schema();
+    const rows = await listD1CMSRecords<CMSProduct>("products");
+    const onlyPublished = String(req.query.onlyPublished || "").toLowerCase() === "1" || String(req.query.onlyPublished || "").toLowerCase() === "true";
+    const filtered = onlyPublished ? rows.filter((item) => item?.status === "published") : rows;
+    filtered.sort((a, b) => String((b as any)?.updatedAt || "").localeCompare(String((a as any)?.updatedAt || "")));
+    res.json({ data: filtered });
+  } catch (error: any) {
+    console.error("Failed to list D1 products:", error);
+    res.status(500).json({ error: error.message || "Failed to list D1 products" });
+  }
+});
+
+app.post("/api/cms/init/categories", async (_req, res) => {
+  try {
+    if (!hasD1Config()) {
+      res.status(503).json({ error: "D1 is not configured." });
+      return;
+    }
+    await ensureD1Schema();
+
+    const categoriesResponse = await fetchWorkerJson<{ data: WorkerCategory[] }>("/api/v1/catalog/categories");
+    const categories = Array.isArray(categoriesResponse.data) ? categoriesResponse.data : [];
+
+    const byCode = new Map<ProductCategory, CMSCategory>();
+    for (const [index, item] of categories.entries()) {
+      const mapped = buildCMSCategoryFromWorker(item, index);
+      if (!byCode.has(mapped.code)) {
+        byCode.set(mapped.code, mapped);
+      }
+    }
+
+    const rows = Array.from(byCode.values());
+    for (const row of rows) {
+      await upsertD1CMSRecord("categories", row.id, row);
+    }
+
+    res.json({
+      data: {
+        total: rows.length,
+      },
+    });
+  } catch (error: any) {
+    console.error("Failed to initialize D1 categories:", error);
+    res.status(500).json({ error: error.message || "Failed to initialize D1 categories" });
+  }
+});
+
+app.post("/api/cms/init/products", async (_req, res) => {
+  try {
+    if (!hasD1Config()) {
+      res.status(503).json({ error: "D1 is not configured." });
+      return;
+    }
+    await ensureD1Schema();
+
+    const payload = await buildAdminResourcePayload({ includeAll: true });
+    const sourceRows = payload.products || [];
+    let success = 0;
+
+    for (const row of sourceRows) {
+      const mapped = buildCMSProductFromResourceRow(row);
+      await upsertD1CMSRecord("products", mapped.id, mapped);
+      success += 1;
+    }
+
+    res.json({
+      data: {
+        total: sourceRows.length,
+        success,
+      },
+    });
+  } catch (error: any) {
+    console.error("Failed to initialize D1 products:", error);
+    res.status(500).json({ error: error.message || "Failed to initialize D1 products" });
   }
 });
 

@@ -3,6 +3,7 @@ import { Plus, Save, Trash2 } from "lucide-react";
 import { CMSCategory, ProductCategory } from "../../types";
 import { deleteCMSCategory, getCMSCategories, saveCMSCategory } from "../../lib/cmsService";
 import { getBackendPickerPayload } from "../../lib/backendResourceService";
+import { getD1CMSCategories, initD1CMSCategories } from "../../lib/cmsD1Service";
 
 const categoryCodes: ProductCategory[] = [
   "balance",
@@ -42,6 +43,15 @@ export default function CategoryManager({ lang }: { lang: "zh" | "en" }) {
   const [initializing, setInitializing] = useState(false);
 
   async function refresh() {
+    try {
+      const data = await getD1CMSCategories(false);
+      if (data.length > 0) {
+        setItems(data);
+        return;
+      }
+    } catch {
+      // fallback to firestore cms service
+    }
     const data = await getCMSCategories(false);
     setItems(data);
   }
@@ -97,6 +107,19 @@ export default function CategoryManager({ lang }: { lang: "zh" | "en" }) {
 
     setInitializing(true);
     try {
+      try {
+        const d1Result = await initD1CMSCategories();
+        await refresh();
+        alert(
+          lang === "zh"
+            ? `D1 初始化完成，共 ${d1Result.total} 个品类。`
+            : `D1 initialization complete: ${d1Result.total} categories.`
+        );
+        return;
+      } catch {
+        // fallback to previous firestore initialization path
+      }
+
       const backendPayload = await getBackendPickerPayload({ includeAll: true });
       const backendCategories = backendPayload.categories || [];
       const existing = await getCMSCategories(false);
