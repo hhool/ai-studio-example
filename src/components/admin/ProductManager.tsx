@@ -19,6 +19,7 @@ import { validateCMSProduct } from "../../lib/productValidation";
 import SmartImage from "../common/SmartImage";
 import BackendResourcePicker from "./BackendResourcePicker";
 import { auth } from "../../lib/firebase";
+import { getBackendPickerPayload } from "../../lib/backendResourceService";
 
 function normalizeProductImagesForSave(product: CMSProduct): CMSProduct {
   const imageSet = resolveProductImages(product);
@@ -52,6 +53,7 @@ function normalizeProductImagesForSave(product: CMSProduct): CMSProduct {
 export default function ProductManager({ lang }: { lang: "zh" | "en" }) {
   const [products, setProducts] = useState<CMSProduct[]>([]);
   const [scenarios, setScenarios] = useState<CMSScenario[]>([]);
+  const [backendPreviewMode, setBackendPreviewMode] = useState(false);
   const [search, setSearch] = useState("");
   const [editingProduct, setEditingProduct] = useState<CMSProduct | null>(null);
   const importRef = useRef<HTMLInputElement | null>(null);
@@ -65,7 +67,66 @@ export default function ProductManager({ lang }: { lang: "zh" | "en" }) {
       getCMSProducts(),
       getCMSScenarios(true),
     ]);
-    setProducts(productsData);
+    if (productsData.length > 0) {
+      setProducts(productsData);
+      setBackendPreviewMode(false);
+    } else {
+      try {
+        const pickerPayload = await getBackendPickerPayload();
+        const fallbackProducts: CMSProduct[] = (pickerPayload.products || []).slice(0, 60).map((item) => ({
+          id: item.id,
+          name: item.title,
+          brand: item.brand || "Unknown",
+          category: "stroller",
+          wheelSize: "N/A",
+          weight: 0,
+          material: "N/A",
+          brakeType: "N/A",
+          tireType: "N/A",
+          price: 0,
+          ageRange: "0-4y",
+          heightRange: [65, 120],
+          compliance: ["EN1888"],
+          imageUrl: item.coverImage || "",
+          galleryUrls: item.galleryImages || [],
+          videoUrl: item.videoUrls?.[0] || "",
+          features: ["backend-preview"],
+          scenarios: ["city-commute"],
+          relatedProductIds: [],
+          videos: (item.videoUrls || []).map((url, idx) => ({
+            url,
+            title: `preview-video-${idx + 1}`,
+            source: "scraped",
+            order: idx,
+          })),
+          status: "draft",
+          zh: {
+            name: item.title,
+            description: "CMS 空数据时自动加载的 backend 预览条目。",
+            brandText: item.brand || "Unknown",
+            specsText: "Preview mode",
+            pros: ["backend preview"],
+            cons: ["not persisted until saved"],
+            editorVerdict: "请编辑后保存到 CMS。",
+          },
+          en: {
+            name: item.title,
+            description: "Backend preview item loaded because CMS is empty.",
+            brandText: item.brand || "Unknown",
+            specsText: "Preview mode",
+            pros: ["backend preview"],
+            cons: ["not persisted until saved"],
+            editorVerdict: "Edit and save to persist into CMS.",
+          },
+          updatedAt: null,
+        }));
+        setProducts(fallbackProducts);
+        setBackendPreviewMode(fallbackProducts.length > 0);
+      } catch {
+        setProducts([]);
+        setBackendPreviewMode(false);
+      }
+    }
     setScenarios(scenariosData);
   };
 
@@ -272,6 +333,14 @@ export default function ProductManager({ lang }: { lang: "zh" | "en" }) {
       </header>
 
       {/* Filter Bar */}
+      {backendPreviewMode && (
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl px-5 py-3 text-xs font-bold text-amber-700">
+          {lang === "zh"
+            ? "当前 CMS 产品库为空，已自动展示 backend 预览条目。编辑后点击保存可写入 CMS。"
+            : "CMS product collection is empty. Backend preview entries are shown automatically. Edit and save to persist into CMS."}
+        </div>
+      )}
+
       <div className="relative group">
         <Search className="absolute left-6 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 group-focus-within:text-orange-500 transition-colors" />
         <input 
